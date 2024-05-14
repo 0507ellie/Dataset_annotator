@@ -19,6 +19,11 @@ depend on, and they will be installed using:
 $ pip install -r requirements.txt
 ```
 
+This command utilizes the PyQt5 Resource Compiler (pyrcc5) tool. Its purpose is to compile a resource file (.qrc file) into Python code, allowing you to utilize these resources in your application, such as images, fonts, style sheets, etc.
+```bash
+$ pyrcc5 -o modules/libs/resources.py modules/resources.qrc
+```
+
 <h1 id="Usage">➤ Usage</h1>
 
 Note: 
