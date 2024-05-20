@@ -3,17 +3,22 @@
 '''
 Purpose: Easy video labeling using tracking
 '''
-import codecs, sys, subprocess
-import argparse
-import cv2, os
+import cv2 
+import os 
+import time
 import logging
+import argparse
 import numpy as np
 import PySimpleGUI as sg 
 sg.theme('Material1')
+import codecs, sys, subprocess
 from typing import *
 from pathlib import Path
+from modules.libs.resources import *
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QApplication, QMessageBox)
+import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
 
 from modules.libs.create_ml_io import JSON_EXT
 from modules.libs.pascal_voc_io import XML_EXT
@@ -227,11 +232,14 @@ class LoadingQWidget(QtWidgets.QWidget):
         super().__init__()
         self.label = QtWidgets.QLabel("Video Files List Path : ",self)
         self.itemLineEdit = QtWidgets.QLineEdit(self)
+        self.selectBtn = QtWidgets.QPushButton(self)
         self.addBtn = QtWidgets.QPushButton("Add",self)  
         self.removeBtn = QtWidgets.QPushButton("Remove",self)
         self.pathList = DragInWidget(self)
+        
         self.addBtn.clicked.connect(self.addClicked) 
-        self.removeBtn.clicked.connect(self.removeClick)      
+        self.removeBtn.clicked.connect(self.removeClick)    
+        self.selectBtn.clicked.connect(self.selectClick)      
         self.pathList.itemSelectionChanged.connect(self.itemSelectionChange)
         self.__initialize()
         # self.hide()
@@ -255,11 +263,15 @@ class LoadingQWidget(QtWidgets.QWidget):
             }'''
 
         additemHLayout = QtWidgets.QHBoxLayout()
-        self.itemLineEdit.setFixedHeight(30)
         self.itemLineEdit.setAlignment( QtCore.Qt.AlignVCenter )
         self.itemLineEdit.setFont(QtGui.QFont('Lucida', 10))
         self.itemLineEdit.setStyleSheet("QLineEdit{border : 1px solid lightdark; border-radius: 10px; background-color: rgb(27,29,35); color : rgb(200, 200, 200)}")
         additemHLayout.addWidget(self.itemLineEdit)
+        self.selectBtn.setIcon(QtGui.QIcon(':/open')) 
+        self.selectBtn.setObjectName('QPushBtn_selectFolder')
+        self.selectBtn.setStyleSheet(btn_layout_qss)
+        self.selectBtn.setFixedSize(50, 30)
+        additemHLayout.addWidget(self.selectBtn)
         self.addBtn.setStyleSheet(btn_layout_qss)
         self.addBtn.setFixedSize(60, 30)
         additemHLayout.addWidget(self.addBtn)
@@ -352,6 +364,11 @@ class LoadingQWidget(QtWidgets.QWidget):
         else:
             self.removeBtn.setEnabled(True)
 
+    def selectClick(self):
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select File")
+        if file_path.endswith(('mp4', 'avi', 'AVI')):
+           self.itemLineEdit.setText(file_path)
+                
     def addClicked(self) :
         query = self.itemLineEdit.text()
         if Path(query).is_file() and ( query.endswith('mp4') or query.endswith('avi') or query.endswith('AVI')): 
@@ -464,11 +481,12 @@ class SettingDialog(QtWidgets.QDialog):
         self.savePathLineEdit.setStyleSheet("QLineEdit{border : 1px solid lightdark; border-radius: 10px; background-color: rgb(27,29,35); color : rgb(200, 200, 200)}")
         self.savePathLineEdit.setPlaceholderText("Select Folder Path")
         self.savePathLineEdit.setText(str(Path(__file__).resolve().parents[0]))
-        self.savePathBtn = QtWidgets.QPushButton("Browse")
+        self.savePathBtn = QtWidgets.QPushButton()
+        self.savePathBtn.setIcon(QtGui.QIcon(':/open')) 
         self.savePathBtn.setObjectName('QPushBtn_selectFolder')
         self.savePathBtn.released.connect(self.__btnMonitor)
         self.savePathBtn.setStyleSheet(BTN_QSS)
-        self.savePathBtn.setFixedSize(80, 30)
+        self.savePathBtn.setFixedSize(50, 30)
         savePathHLayout.addWidget(self.savePathLabel)
         savePathHLayout.addWidget(self.savePathLineEdit)
         savePathHLayout.addWidget(self.savePathBtn)
@@ -514,16 +532,19 @@ class SettingDialog(QtWidgets.QDialog):
         return int(self.intervalBox.value())
     
     def closeEvent(self, event):
-        if self.videoLoading.checkPath():
+        if not self.btn_trigger:
             event.accept()
-            self.close()
-        else:
-            if not self.btn_trigger:
-                event.accept()
-                sys.exit()
-            else: 
+            sys.exit()
+        else :  
+            self.btn_trigger = False
+            if self.videoLoading.checkPath():
+                if Path(self.savePathLineEdit.text()).exists():
+                    QMessageBox.warning(None, 'Warning', "The save path already exists. Please choose a different path.")
+                    event.ignore()
+                else:
+                    event.accept()
+            else:
                 QMessageBox.warning(None, 'Warn', "video path can't be empty.")
-                self.btn_trigger = False
                 event.ignore()
 
 class DeleteDialog(QtWidgets.QDialog):
@@ -588,26 +609,28 @@ class DeleteDialog(QtWidgets.QDialog):
         event.accept()
 
     def update(self):
-        x, y, w, h = self.item_list[self.idComboBox.currentIndex()][1].astype(int)
-        image = self.frame[y:y+h, x:x+w]
-        pixmap = self.convert_nparray_to_QPixmap(image)
-        self.imageLabel.setPixmap(pixmap)
+        if self.item_list:
+            x, y, w, h = self.item_list[self.idComboBox.currentIndex()][1].astype(int)
+            image = self.frame[y:y+h, x:x+w]
+            pixmap = self.convert_nparray_to_QPixmap(image)
+            self.imageLabel.setPixmap(pixmap)
 
-        self.resize(image.shape[1], image.shape[0])
+            self.resize(image.shape[1], image.shape[0])
 
     def getupdateList(self):
         return self.item_list
     
 # #############################################
 class ObjectTack(object):
-    def __init__(self, model: str = 'csrt'):
+    def __init__(self, model: str = 'csrt', cpu_workers: int = 1):
         self.cv2_version = ''.join(cv2.__version__.split('.'))
-        self.bbox_list = []
+        self.cpu_workers = cpu_workers
         self.track_model = model
         self.track_init = False
         self.track_alive = False
         self.label_hist = None
-
+        self.bbox_list = []
+        
     def _init_model(self, model: str) -> None:
         if int(self.cv2_version) >= 454:
             OPENCV_OBJECT_TRACKERS = {
@@ -619,7 +642,10 @@ class ObjectTack(object):
                 "medianflow": cv2.legacy.TrackerMedianFlow_create,
                 "mosse": cv2.legacy.TrackerMOSSE_create,
             }
-            self.multiTracker = cv2.legacy.MultiTracker_create()
+            if self.cpu_workers == 1:
+                self.multiTracker = cv2.legacy.MultiTracker_create()
+            else :
+                self.multiTracker = []
         else :
             OPENCV_OBJECT_TRACKERS = {
                 "csrt": cv2.TrackerCSRT_create,
@@ -630,7 +656,10 @@ class ObjectTack(object):
                 "medianflow": cv2.TrackerMedianFlow_create,
                 "mosse": cv2.TrackerMOSSE_create
             }
-            self.multiTracker = cv2.MultiTracker_create()
+            if self.cpu_workers == 1:
+                self.multiTracker = cv2.MultiTracker_create()
+            else :
+                self.multiTracker = []
         self.tracker = OPENCV_OBJECT_TRACKERS[model]
       
     @staticmethod
@@ -747,7 +776,13 @@ class ObjectTack(object):
 
             if self.track_alive:
                 self._init_model(self.track_model)
-                [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
+                if self.cpu_workers == 1:
+                    [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
+                else:
+                    for label, box in self.bbox_list:
+                        _tracker = self.tracker()
+                        _tracker.init(src_frame, tuple(box))
+                        self.multiTracker.append(_tracker)
         cv2.destroyAllWindows()  
         self.track_init = False
 
@@ -761,13 +796,23 @@ class ObjectTack(object):
         Returns:
             None
         """
-        window = DeleteDialog(src_frame, self.bbox_list)
-        window.exec()
-        self.bbox_list = window.getupdateList()
- 
-        self._init_model(self.track_model)
-        [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
-                
+        if self.bbox_list:
+            window = DeleteDialog(src_frame, self.bbox_list)
+            window.exec()
+            self.bbox_list = window.getupdateList()
+            if not self.bbox_list:
+                self.track_alive = False
+                return 
+            
+            self._init_model(self.track_model)
+            if self.cpu_workers == 1:
+                [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
+            else:
+                for label, box in self.bbox_list:
+                    _tracker = self.tracker()
+                    _tracker.init(src_frame, tuple(box))
+                    self.multiTracker.append(_tracker)
+
     def update(self, src_frame: np.ndarray) -> list:
         """
         Update the tracker with the current frame and return the updated bounding box list.
@@ -778,10 +823,18 @@ class ObjectTack(object):
         Returns:
             list: The updated bounding box list.
         """
+
         if (self.track_alive) :
-            ret, boxes = self.multiTracker.update(src_frame)
-            for idx, (label, box) in enumerate(self.bbox_list):
-                box[:] = boxes[idx]
+            if self.cpu_workers == 1:
+                ret, boxes = self.multiTracker.update(src_frame)
+                for idx, (label, box) in enumerate(self.bbox_list):
+                    box[:] = boxes[idx]
+            else:
+                with ThreadPoolExecutor(max_workers= min(len(self.bbox_list), self.cpu_workers)) as executor:
+                    futures = [executor.submit(tracker.update, src_frame) for tracker in self.multiTracker]
+                    results = [future.result() for future in futures]
+                for (label, box), (ret, _box) in zip(self.bbox_list, results):
+                    box[:] = _box
         return self.bbox_list
 
 if __name__ == '__main__':
@@ -839,17 +892,18 @@ if __name__ == '__main__':
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         ret, image = cap.retrieve()
 
-        tracker = ObjectTack()
+        tracker = ObjectTack(cpu_workers=mp.cpu_count() - 1)
         tracker.loadClasses(args.class_file)
         tracker.initBox(image)
         
         for frame_index in range(start_frame, end_frame):
+            s = time.time()
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             if cap.grab():
                 ret, image = cap.retrieve()
                 
             if ret:
-                key = cv2.waitKey(33) 
+                key = cv2.waitKey(5) 
                 # press 'Esc' to exit
                 if key == 27:
                     exit = True
@@ -863,7 +917,7 @@ if __name__ == '__main__':
 
                 # update tracker
                 tracker_list = tracker.update(image)
-
+                
                 # write .jpg and .xml/txt to disk
                 if frame_index % interval_frame == 0:
                     image_file_name = str(frame_index).rjust(5, '0') + '.jpg'
@@ -898,5 +952,7 @@ if __name__ == '__main__':
                     cv2.putText(image, str(idx) + " | " + label, (sxsy[0], sxsy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
                     cv2.rectangle(image, sxsy, exey, color, 2)
                 image = cv2.resize(image, DISPLAT_SIZE)
+                
+                cv2.putText(image, f"{frame_index} / {end_frame} | Time: {round((time.time() - s)*1000, 2)} ms", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
                 cv2.imshow('Labeling Mode - ' + str(video_path.stem), image)
         debug.info('End prossiing [%s] video ...'  % video_path.stem)
