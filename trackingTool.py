@@ -526,6 +526,78 @@ class SettingDialog(QtWidgets.QDialog):
                 self.btn_trigger = False
                 event.ignore()
 
+class DeleteDialog(QtWidgets.QDialog):
+    def __init__(self, frame=np.ndarray, item_list=[], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.frame = frame
+        self.item_list = item_list
+        self.setWindowTitle('Delete Obj')
+        # self.setStyleSheet('background-color: rgb(61, 68, 85);')
+
+        self.imageLabel = QtWidgets.QLabel(self)
+        self.imageLabel.setAlignment(QtCore.Qt.AlignCenter) 
+
+        idHlayout = QtWidgets.QHBoxLayout()
+        idLabel = QtWidgets.QLabel('Select Object ID: ', self)
+        # idLabel.setStyleSheet("color : rgb(255, 255, 255);")
+        idLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
+        idHlayout.addWidget(idLabel )
+        self.idComboBox = QtWidgets.QComboBox(self)
+        [self.idComboBox.addItem(f"{idx} | {label} | {box.astype(int)}") 
+                                    for idx, (label, box) in enumerate(self.item_list)]
+        self.idComboBox.activated.connect(self.update)
+        idHlayout.addWidget(self.idComboBox)
+
+        btnHlayout = QtWidgets.QHBoxLayout()
+        self.submitBtn = QtWidgets.QPushButton("Submit", self) 
+        self.submitBtn.setObjectName('QPushBtn_submit') 
+        self.submitBtn.released.connect(self.close)
+        self.submitBtn.setStyleSheet(BTN_QSS)
+        self.submitBtn.setFixedHeight(30)
+        btnHlayout.addWidget(self.submitBtn)
+
+        self.cancelBtn = QtWidgets.QPushButton("Cancel", self) 
+        self.cancelBtn.setObjectName('QPushBtn_cancel') 
+        self.cancelBtn.released.connect(self.close)
+        self.cancelBtn.setStyleSheet(BTN_QSS)
+        self.cancelBtn.setFixedHeight(30)
+        btnHlayout.addWidget(self.cancelBtn)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.imageLabel)
+        layout.addLayout(idHlayout)
+        layout.addLayout(btnHlayout)
+
+        self.update() 
+
+    def convert_nparray_to_QPixmap(self, img):
+        h, w, ch = img.shape
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_bytes = img.tobytes()
+        
+        qimg = QtGui.QImage(img_bytes, w, h, w * ch, QtGui.QImage.Format_RGB888) 
+        qpixmap = QtGui.QPixmap.fromImage(qimg)
+        return qpixmap
+
+    def closeEvent(self, event):
+        if self.sender() == self.submitBtn:
+            del self.item_list[self.idComboBox.currentIndex()]
+        event.accept()
+
+    def update(self):
+        x, y, w, h = self.item_list[self.idComboBox.currentIndex()][1].astype(int)
+        image = self.frame[y:y+h, x:x+w]
+        pixmap = self.convert_nparray_to_QPixmap(image)
+        self.imageLabel.setPixmap(pixmap)
+
+        self.resize(image.shape[1], image.shape[0])
+
+    def getupdateList(self):
+        return self.item_list
+    
 # #############################################
 class ObjectTack(object):
     def __init__(self, model: str = 'csrt'):
@@ -689,22 +761,12 @@ class ObjectTack(object):
         Returns:
             None
         """
-        bbox_info = [ f"{idx} | {label} | {box}" for idx, (label, box) in enumerate(self.bbox_list)]
-        layout = [
-            [sg.Text("Select Label: ", size=(15, 1))],
-            [sg.Combo(bbox_info, size=(50, 1), default_value=bbox_info[0], readonly=True, key="-LABEL-")],
-            [sg.Submit(), sg.Cancel()]
-        ]
-        window = sg.Window('Delete Obj', layout)
-        event, label = window.read()
-        window.close()
-
-        if event == "Submit":
-            id = bbox_info.index(label["-LABEL-"])
-            del self.bbox_list[id]
-
-            self._init_model(self.track_model)
-            [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
+        window = DeleteDialog(src_frame, self.bbox_list)
+        window.exec()
+        self.bbox_list = window.getupdateList()
+ 
+        self._init_model(self.track_model)
+        [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
                 
     def update(self, src_frame: np.ndarray) -> list:
         """
@@ -721,12 +783,13 @@ class ObjectTack(object):
             for idx, (label, box) in enumerate(self.bbox_list):
                 box[:] = boxes[idx]
         return self.bbox_list
-    
+
 if __name__ == '__main__':
     IMAGE_TAG = "images"
     LABEL_TAG = "labels"
     args = argparser.parse_args()
     app = QtWidgets.QApplication(sys.argv)
+
     if args.video_dir:
         interval_frame = 10
         ROOT_DIRS = args.video_dir
