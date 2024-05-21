@@ -1,7 +1,7 @@
 lxml
 pillow
 packaging
-PyQt5
+PyQt5==5.14.2
 opencv-python==4.9.0.80
 opencv-contrib-python==4.9.0.80
 PySimpleGUI==4.24.0

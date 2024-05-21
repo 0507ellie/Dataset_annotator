@@ -12,18 +12,18 @@ from functools import partial
 from pathlib import Path
 from PyQt5 import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
-# Note : run pyrcc5 -o modules/libs/resources.py modules/resources.qrc
+# Note : run pyrcc5 -o modules/resources/resources.py modules/resources.qrc
 
-from modules.libs.constants import *
-from modules.libs.create_ml_io import JSON_EXT, CreateMLReader
-from modules.libs.labelDialog import LabelDialog
-from modules.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
-from modules.libs.pascal_voc_io import XML_EXT, PascalVocReader
-from modules.libs.resources import *
-from modules.libs.ustr import ustr
-from modules.libs.utils import *
-from modules.libs.yolo_io import TXT_EXT, YoloReader
-from modules.libs import qdarkstyle
+from modules.labeling.libs.constants import *
+from modules.labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
+from modules.labeling.libs.labelDialog import LabelDialog
+from modules.labeling.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
+from modules.labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
+from modules.labeling.libs.ustr import ustr
+from modules.labeling.libs.utils import *
+from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
+from modules import qdarkstyle
+from modules.resources.resources  import *
 from modules.logger import Logger
 
 from trackingTool import ObjectTack

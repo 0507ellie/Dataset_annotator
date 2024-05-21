@@ -4,8 +4,8 @@
 """QDarkStyle default light palette."""
 
 # Local imports
-from libs.qdarkstyle.colorsystem import Blue, Gray
-from libs.qdarkstyle.palette import Palette
+from qdarkstyle.colorsystem import Blue, Gray
+from qdarkstyle.palette import Palette
 
 
 class LightPalette(Palette):

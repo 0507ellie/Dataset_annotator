@@ -12,32 +12,32 @@ from functools import partial
 
 from PyQt5 import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
-# Note : run pyrcc5 -o modules/libs/resources.py modules/resources.qrc
+# Note : run pyrcc5 -o modules/resources/resources.py modules/resources.qrc
 
-from modules.libs.canvas import Canvas
-from modules.libs.colorDialog import ColorDialog
-from modules.libs.combobox import ComboBox
-from modules.libs.constants import *
-from modules.libs.create_ml_io import JSON_EXT, CreateMLReader
-from modules.libs.hashableQListWidgetItem import HashableQListWidgetItem
-from modules.libs.labelDialog import LabelDialog
-from modules.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
-from modules.libs.pascal_voc_io import XML_EXT, PascalVocReader
-from modules.libs.resources import *
-from modules.libs.settings import Settings
-from modules.libs.shape import DEFAULT_FILL_COLOR, DEFAULT_LINE_COLOR, Shape
-from modules.libs.stringBundle import StringBundle
-from modules.libs.thumbnailView import ThumbnailView
-from modules.libs.toolBar import ToolBar
-from modules.libs.ustr import ustr
-from modules.libs.utils import *
-from modules.libs.yolo_io import TXT_EXT, YoloReader
-from modules.libs.zoomWidget import ZoomWidget
-from modules.libs import qdarkstyle
+from modules.labeling.libs.canvas import Canvas
+from modules.labeling.libs.colorDialog import ColorDialog
+from modules.labeling.libs.combobox import ComboBox
+from modules.labeling.libs.constants import *
+from modules.labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
+from modules.labeling.libs.hashableQListWidgetItem import HashableQListWidgetItem
+from modules.labeling.libs.labelDialog import LabelDialog
+from modules.labeling.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
+from modules.labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
+from modules.labeling.libs.settings import Settings
+from modules.labeling.libs.shape import DEFAULT_FILL_COLOR, DEFAULT_LINE_COLOR, Shape
+from modules.labeling.libs.stringBundle import StringBundle
+from modules.labeling.libs.thumbnailView import ThumbnailView
+from modules.labeling.libs.toolBar import ToolBar
+from modules.labeling.libs.ustr import ustr
+from modules.labeling.libs.utils import *
+from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
+from modules.labeling.libs.zoomWidget import ZoomWidget
+from modules import qdarkstyle
+from modules.resources.resources  import *
 from modules.logger import Logger
 
 # Bundles Python Application
-# pyinstaller --paths ./modules/ -F -w labelingTool.py --icon=./resources/icons/app.ico
+# pyinstaller --paths ./modules.labeling/ -F -w labelingTool.py --icon=./resources/icons/app.ico
 # run: ./labelingTool
 
 LABELGTING = 'LabelingTool'
@@ -230,10 +230,9 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.setCentralWidget(scroll)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.file_dock)
-        self.file_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable)
-
+        
         self.dock_features = QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetFloatable
-        self.dock.setFeatures(self.dock.features() ^ self.dock_features)
+        self.dock.setFeatures(self.dock_features)
 
         self.progress = QtWidgets.QProgressDialog(self)
         self.progress.setStyleSheet("QLabel{font-family: 宋体;"
@@ -733,7 +732,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.show_tutorial_dialog(browser='default')
 
     def show_info_dialog(self):
-        from modules.libs.__init__ import __version__
+        from modules.labeling.libs.__init__ import __version__
         msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(LABELGTING, __version__, sys.version_info)
         QtWidgets.QMessageBox.information(self, u'Information', msg)
 

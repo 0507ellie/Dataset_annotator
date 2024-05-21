@@ -28,7 +28,7 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
     This command utilizes the PyQt5 Resource Compiler (pyrcc5) tool. Its purpose is to compile a resource file (.qrc file) into Python code, allowing you to utilize these resources in your application, such as images, fonts, style sheets, etc.
     ```bash
-    $ pyrcc5 -o modules/libs/resources.py modules/resources.qrc
+    $ pyrcc5 -o modules/resources/resources.py modules/resources.qrc
     ```
 
 <h1 id="Usage">➤ Usage</h1>

@@ -66,9 +66,9 @@ import sys
 import warnings
 
 # Local imports
-from libs.qdarkstyle.dark.palette import DarkPalette
-from libs.qdarkstyle.light.palette import LightPalette
-from libs.qdarkstyle.palette import Palette
+from qdarkstyle.dark.palette import DarkPalette
+from qdarkstyle.light.palette import LightPalette
+from qdarkstyle.palette import Palette
 
 __version__ = "3.0.2"
 
@@ -247,13 +247,13 @@ def _load_stylesheet(qt_api='', palette=None):
 
     # Then we import resources - binary qrc content
     if palette is None:
-        from libs.qdarkstyle.dark import style_rc
+        from qdarkstyle.dark import style_rc
         palette = DarkPalette
     elif palette.ID == 'dark':
-        from libs.qdarkstyle.dark import style_rc
+        from qdarkstyle.dark import style_rc
         palette = DarkPalette
     elif palette.ID == 'light':
-        from libs.qdarkstyle.light import style_rc
+        from qdarkstyle.light import style_rc
         palette = LightPalette
     else:
         print("Not recognized ID for palette! Exiting!")
