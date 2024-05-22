@@ -9,9 +9,7 @@ import time
 import logging
 import argparse
 import numpy as np
-import PySimpleGUI as sg 
 import multiprocessing as mp
-sg.theme('Material1')
 import codecs, sys
 from typing import *
 from pathlib import Path
@@ -24,8 +22,8 @@ from modules.labeling.libs.pascal_voc_io import XML_EXT
 from modules.labeling.libs.yolo_io import TXT_EXT
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
 from modules.tracking.libs.fileDialog import FileDialog
-from modules.tracking.libs.deleteDialog import DeleteDialog
-from modules import qdarkstyle
+from modules.tracking.libs.painterDialog import PainterDialog
+from modules.tracking.motion import MotionDetector
 from modules.resources.resources  import *
 from modules.logger import Logger
 
@@ -45,9 +43,9 @@ class ObjectTack(object):
     def __init__(self, model: str = 'csrt', cpu_workers: int = 1):
         self.cv2_version = ''.join(cv2.__version__.split('.'))
         self.cpu_workers = cpu_workers
+        
         self.track_model = model
         self.track_init = False
-        self.track_alive = False
         self.label_hist = None
         self.bbox_list = []
         
@@ -146,55 +144,15 @@ class ObjectTack(object):
         Returns:
             None
         """
-        height, width, _ = src_frame.shape
         if (not self.track_init) :
             self.track_init = True
-            frame = cv2.resize(src_frame, DISPLAT_SIZE)
-            frame_show = frame.copy()
-            while(True):
-                bbox = np.array(cv2.selectROI('ROI Mode', frame_show, True), dtype=float)
-                if (sum(bbox[-2:]) >= 10):
-                    # Initialize tracker with first frame and bounding box
-                    sxsy = (int(bbox[0]), int(bbox[1]))
-                    exey = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                    tracking_image = frame[sxsy[1]:exey[1], sxsy[0]:exey[0]]
-                    
-                    if self.label_hist != None:
-                        content = [[sg.Text("Select Label", font='Any 10'), 
-                                    sg.Combo(self.label_hist, size=(15, 5), font='Any 12', default_value=self._label if hasattr(self, "_label") else self.label_hist[0], 
-                                    readonly=True, key = "-LABEL-")]]
-                    else:
-                        content = [[sg.Text('Input the name of label:', font='Any 10')],  
-                                    [sg.InputText(key="-LABEL-", font='Any 10')]]
-                    layout = [[sg.Image(data=cv2.imencode('.png', tracking_image)[1].tobytes())], 
-                              *content,
-                              [sg.Submit(), sg.Cancel()]] 
-                    window = sg.Window('Select ROI', layout)
-                    event, label = window.read() 
-                    window.close()
+            window = PainterDialog(src_frame.copy(), self.classes_file, debug=debug)
+            window.set_qdarkstyle()
+            window.load_bbox_by_list(self.bbox_list)
+            window.exec()
+            self.bbox_list = window.get_labels()
 
-                    if event in (0, 'Cancel'):
-                        continue
-                    elif label["-LABEL-"] != "":
-                        self._label = label["-LABEL-"] 
-                        bbox[[0, 2]] *= width/DISPLAT_SIZE[0]
-                        bbox[[1, 3]] *= height/DISPLAT_SIZE[1]
-                        if self.bbox_list != []:
-                            for idx, (_, box) in enumerate(self.bbox_list):
-                                thres = self._iou(box, bbox)
-                                if thres > 0.4:
-                                    del self.bbox_list[idx] 
-                        self.bbox_list.append([label["-LABEL-"], bbox])
-
-                        self.track_alive = True
-                        cv2.rectangle(frame_show, sxsy, exey, self.classes_color[label["-LABEL-"]] if self.classes_color else (0,0,255), 2)
-                else:
-                    if sg.popup_ok_cancel('Is the mark completed?') == 'OK':
-                        break
-                    else :
-                        continue
-
-            if self.track_alive:
+            if self.bbox_list:
                 self._init_model(self.track_model)
                 if self.cpu_workers == 1:
                     [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
@@ -203,35 +161,7 @@ class ObjectTack(object):
                         _tracker = self.tracker()
                         _tracker.init(src_frame, tuple(box))
                         self.multiTracker.append(_tracker)
-        cv2.destroyAllWindows()  
         self.track_init = False
-
-    def removeBox(self, src_frame: np.ndarray) -> None:
-        """
-        Display a GUI window to select and delete an object from the tracker.
-
-        Args:
-            src_frame (np.ndarray): The source frame as a NumPy array.
-
-        Returns:
-            None
-        """
-        if self.bbox_list:
-            window = DeleteDialog(src_frame, self.bbox_list)
-            window.exec()
-            self.bbox_list = window.getupdateList()
-            if not self.bbox_list:
-                self.track_alive = False
-                return 
-            
-            self._init_model(self.track_model)
-            if self.cpu_workers == 1:
-                [self.multiTracker.add(self.tracker(), src_frame, tuple(box)) for label, box in self.bbox_list]
-            else:
-                for label, box in self.bbox_list:
-                    _tracker = self.tracker()
-                    _tracker.init(src_frame, tuple(box))
-                    self.multiTracker.append(_tracker)
 
     def update(self, src_frame: np.ndarray) -> list:
         """
@@ -244,7 +174,7 @@ class ObjectTack(object):
             list: The updated bounding box list.
         """
 
-        if (self.track_alive) :
+        if self.bbox_list:
             if self.cpu_workers == 1:
                 ret, boxes = self.multiTracker.update(src_frame)
                 for idx, (label, box) in enumerate(self.bbox_list):
@@ -315,9 +245,10 @@ if __name__ == '__main__':
         tracker = ObjectTack(cpu_workers=mp.cpu_count() - 1)
         tracker.loadClasses(args.class_file)
         tracker.initBox(image)
-        
+        motion = MotionDetector()
         for frame_index in range(start_frame, end_frame):
             s = time.time()
+            save_status = False
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             if cap.grab():
                 ret, image = cap.retrieve()
@@ -331,15 +262,13 @@ if __name__ == '__main__':
                 #  press 'Tab' or 'Enter' to reinitialize tracker (+ bboxs and labels)
                 elif key == 9 or key==13:
                     tracker.initBox(image)
-                # press 'Delete' to del bbox (linux - 255 / windows - 0)
-                elif key == 255 or key== 0: 
-                    tracker.removeBox(image)
 
                 # update tracker
                 tracker_list = tracker.update(image)
-                
+
                 # write .jpg and .xml/txt to disk
-                if frame_index % interval_frame == 0:
+                if frame_index % interval_frame == 0 or motion.update(image):
+                    save_status = True
                     image_file_name = str(frame_index).rjust(5, '0') + '.jpg'
                     label_file_name = str(frame_index).rjust(5, '0') + TXT_EXT
                     cv2.imwrite(str(images_dir_path.joinpath(image_file_name)), image)
@@ -362,7 +291,8 @@ if __name__ == '__main__':
                     #                                     shapes, 
                     #                                     str(images_dir_path.joinpath(image_file_name)), 
                     #                                     image)
-
+                motion.DrawMotionOnFrame(image)
+                # motion.DrawMotionHeatmap()
                 # draw tracker bboxs on image
                 for idx, (label, bbox) in enumerate(tracker_list):
                     sxsy = (int(bbox[0]), int(bbox[1]))
@@ -373,6 +303,8 @@ if __name__ == '__main__':
                     cv2.rectangle(image, sxsy, exey, color, 2)
                 image = cv2.resize(image, DISPLAT_SIZE)
                 
-                cv2.putText(image, f"{frame_index} / {end_frame} | Time: {round((time.time() - s)*1000, 2)} ms", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                cv2.putText(image, f"{frame_index} / {end_frame} | Time: {round((time.time() - s)*1000, 2)} ms", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                save_text = "No Saving"
+                cv2.putText(image, "Saving" if save_status else "No Saving", (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255) if save_status else (0, 255, 0), 2)
                 cv2.imshow('Labeling Mode - ' + str(video_path.stem), image)
         debug.info('End prossiing [%s] video ...'  % video_path.stem)

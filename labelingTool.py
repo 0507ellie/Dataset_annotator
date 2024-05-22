@@ -1418,6 +1418,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.dir_name = dir_path
         self.file_path = None
         self.file_list_widget.clear()
+
         self.m_img_list = self.scan_all_images(dir_path) 
         self.img_count = len(self.m_img_list)
         self.open_next_image()

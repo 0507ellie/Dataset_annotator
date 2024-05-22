@@ -64,12 +64,16 @@ Note:
 
 - Keyboard operation:
 
-    Note: if `Enter`下想修正相同目標跟框有些微偏移時, 只需在框新的框它會自動修正舊的偏移框
-    | ID       | Describe           |
-    |----------|--------------------|
-    | Enter    |Create new bbox.    |
-    | Delete   |Delete error bbox.  |
-    | Esc      |Quit.               | 
+    | ID       | Describe            |
+    |----------|---------------------|
+    | Tab      |Enter Label Painter. |
+    | Esc      |Quit.                | 
+
+    Label Painter
+    | ID       | Describe             |
+    |----------|----------------------|
+    | w        |Create Box.           |
+    | Delete   |Select Box and Delete.|
 
 ***Manual Labeling Tool*** :
 ```bash

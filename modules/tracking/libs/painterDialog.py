@@ -1,0 +1,907 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import argparse
+import codecs
+import os.path
+import logging
+import sys
+import cv2
+import numpy as np
+from functools import partial
+from PyQt5 import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from typing import *
+
+from modules.labeling.libs.canvas import Canvas
+from modules.labeling.libs.colorDialog import ColorDialog
+from modules.labeling.libs.constants import *
+from modules.labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
+from modules.labeling.libs.hashableQListWidgetItem import HashableQListWidgetItem
+from modules.labeling.libs.labelDialog import LabelDialog
+from modules.labeling.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
+from modules.labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
+from modules.labeling.libs.settings import Settings
+from modules.labeling.libs.shape import DEFAULT_FILL_COLOR, DEFAULT_LINE_COLOR, Shape
+from modules.labeling.libs.stringBundle import StringBundle
+from modules.labeling.libs.toolBar import ToolBar
+from modules.labeling.libs.ustr import ustr
+from modules.labeling.libs.utils import *
+from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
+from modules.labeling.libs.zoomWidget import ZoomWidget
+from modules import qdarkstyle
+from modules.resources.resources  import *
+from modules.logger import Logger
+
+TITLE = 'LabelPainter'
+debug = Logger(None, logging.INFO, logging.INFO )
+
+class WindowMixin(object):
+
+    def menu(self, title, actions=None):
+        menu = self.menuBar().addMenu(title)
+        if actions:
+            add_actions(menu, actions)
+        return menu
+
+    def toolbar(self, title, actions=None):
+        toolbar = ToolBar(title)
+        toolbar.setObjectName(u'%sToolBar' % title)
+        toolbar.setOrientation(Qt.Vertical)
+        toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
+        if actions:
+            add_actions(toolbar, actions)
+        # self.addToolBar(QtCore.Qt.LeftToolBarArea, toolbar)
+        return toolbar
+
+class PainterDialog(QtWidgets.QDialog, WindowMixin):
+    FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
+
+    def __init__(self, default_filename: Optional[Union[str, np.ndarray]] = None, 
+                       default_prefdef_class_file: Optional[str] = None, 
+                       debug=None):
+        super(PainterDialog, self).__init__()
+        if (debug == None) :
+            self.debug = Logger(None, logging.INFO, logging.INFO )
+        else :
+            self.debug = debug
+        self.setWindowTitle(TITLE)
+        self.setWindowIcon(QtGui.QIcon(':/LabelGTImg'))
+        # Load setting in the main thread
+        self.settings = Settings()
+        self.settings.load()
+        settings = self.settings
+
+        # Load string bundle for i18n
+        self.string_bundle = StringBundle.get_bundle()
+        get_str = lambda str_id: self.string_bundle.get_string(str_id)
+
+        # Save as Pascal voc xml
+        self.label_file_format = settings.get(SETTING_LABEL_FILE_FORMAT, LabelFileFormat.PASCAL_VOC)
+
+        # For loading all image under a directory
+        self.dir_name = None
+        self.label_hist = []
+        self.last_open_dir = None
+        self.cur_img_idx = 0
+        self.img_count = 1
+
+        # Whether we need to save or not.
+        self.dirty = False
+        
+        self._beginner = True
+
+        # Load predefined classes to the list
+        self.load_predefined_classes(default_prefdef_class_file)
+
+        # Main widgets and related state.
+        self.label_dialog = LabelDialog(parent=self, list_item=self.label_hist)
+
+        self.items_to_shapes = {}
+        self.shapes_to_items = {}
+        self.prev_label_text = ''
+
+        self.zoom_widget = ZoomWidget()
+        self.color_dialog = ColorDialog(parent=self)
+        
+        self.canvas = Canvas(parent=self)
+        self.canvas.zoomRequest.connect(self.zoom_request)
+        self.canvas.set_drawing_free_shape(True)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidget(self.canvas)
+        scroll.setWidgetResizable(True)
+        self.scroll_bars = {
+            QtCore.Qt.Vertical: scroll.verticalScrollBar(),
+            QtCore.Qt.Horizontal: scroll.horizontalScrollBar()
+        }
+        self.scroll_area = scroll
+        self.canvas.scrollRequest.connect(self.scroll_request)
+
+        self.canvas.newShape.connect(self.new_shape)
+        self.canvas.selectionChanged.connect(self.shape_selection_changed)
+        self.canvas.drawingPolygon.connect(self.toggle_drawing_sensitive)
+
+        # self.setCentralWidget(scroll)
+        
+        action = partial(new_action, self)
+        quit = action(get_str('quit'), self.close,
+                      'Ctrl+Q', 'quit', get_str('quitApp'))
+        create_mode = action(get_str('crtBox'), self.set_create_mode,
+                             'w', 'new', get_str('crtBoxDetail'), enabled=False)
+        edit_mode = action(get_str('editBox'), self.set_edit_mode,
+                           'Ctrl+J', 'edit', get_str('editBoxDetail'), enabled=False)
+
+        create = action(get_str('crtBox'), self.create_shape,
+                        'w', 'new', get_str('crtBoxDetail'), enabled=False)
+        delete = action(get_str('delBox'), self.delete_selected_shape,
+                        'Delete', 'delete', get_str('delBoxDetail'), enabled=False)
+        copy = action(get_str('dupBox'), self.copy_selected_shape,
+                      'Ctrl+D', 'copy', get_str('dupBoxDetail'),
+                      enabled=False)
+        color1 = action(get_str('boxLineColor'), self.choose_color1,
+                        'Ctrl+L', 'color_line', get_str('boxLineColorDetail'))
+        edit = action(get_str('editLabel'), self.edit_label,
+                      'Ctrl+E', 'edit', get_str('editLabelDetail'),
+                      enabled=False)
+        shape_line_color = action(get_str('shapeLineColor'), self.choose_shape_line_color,
+                                  icon='color_line', tip=get_str('shapeLineColorDetail'),
+                                  enabled=False)
+        shape_fill_color = action(get_str('shapeFillColor'), self.choose_shape_fill_color,
+                                  icon='color', tip=get_str('shapeFillColorDetail'),
+                                  enabled=False)
+        
+        zoom = QtWidgets.QWidgetAction(self)
+        zoom.setDefaultWidget(self.zoom_widget)
+        self.zoom_widget.setWhatsThis(
+            u"Zoom in or out of the image. Also accessible with"
+            " %s and %s from the canvas." % (format_shortcut("Ctrl+[-+]"),
+                                             format_shortcut("Ctrl+Wheel")))
+        self.zoom_widget.setEnabled(False)
+
+        zoom_in = action(get_str('zoomin'), partial(self.add_zoom, 10),
+                         'Ctrl++', 'zoom-in', get_str('zoominDetail'), enabled=False)
+        zoom_out = action(get_str('zoomout'), partial(self.add_zoom, -10),
+                          'Ctrl+-', 'zoom-out', get_str('zoomoutDetail'), enabled=False)
+        zoom_org = action(get_str('originalsize'), partial(self.set_zoom, 100),
+                          'Ctrl+=', 'zoom', get_str('originalsizeDetail'), enabled=False)
+        fit_window = action(get_str('fitWin'), self.set_fit_window,
+                            'Ctrl+F', 'fit-window', get_str('fitWinDetail'),
+                            checkable=True, enabled=False)
+        fit_width = action(get_str('fitWidth'), self.set_fit_width,
+                           'Ctrl+Shift+F', 'fit-width', get_str('fitWidthDetail'),
+                           checkable=True, enabled=False)
+        # Group zoom controls into a list for easier toggling.
+        zoom_actions = (self.zoom_widget, zoom_in, zoom_out,
+                        zoom_org, fit_window, fit_width)
+        self.zoom_mode = self.MANUAL_ZOOM
+        self.scalers = {
+            self.FIT_WINDOW: self.scale_fit_window,
+            self.FIT_WIDTH: self.scale_fit_width,
+            # Set to one to scale to 100% when loading files.
+            self.MANUAL_ZOOM: lambda: 1,
+        }
+
+        # Label list context menu.
+        label_menu = QtWidgets.QMenu()
+        add_actions(label_menu, (edit, delete))
+        
+        # Draw squares/rectangles
+        self.draw_rectangles_option = QtWidgets.QAction(get_str('drawRectangles'), self)
+        self.draw_rectangles_option.setShortcut('Ctrl+Shift+R')
+        self.draw_rectangles_option.setCheckable(False)
+        self.draw_rectangles_option.setChecked(settings.get(SETTING_DRAW_SQUARE, False))
+        self.draw_rectangles_option.triggered.connect(self.toggle_draw_rectangles)
+        
+        # Store actions for further handling.
+        self.actions = Struct(open=open, 
+                              lineColor=color1, create=create, delete=delete, edit=edit, copy=copy,
+                              createMode=create_mode, editMode=edit_mode, 
+                              shapeLineColor=shape_line_color, shapeFillColor=shape_fill_color,
+                              zoom=zoom, zoomIn=zoom_in, zoomOut=zoom_out, zoomOrg=zoom_org,
+                              fitWindow=fit_window, fitWidth=fit_width,
+                              zoomActions=zoom_actions,
+                              beginner=(),
+                              beginnerContext=(create, edit, copy, delete),)
+
+        
+        # Custom context menu for the canvas widget:
+        add_actions(self.canvas.menus[0], self.actions.beginnerContext)
+        add_actions(self.canvas.menus[1], (
+            action('&Copy here', self.copy_shape),
+            action('&Move here', self.move_shape)))
+        
+        self.tools = self.toolbar('Tools')
+        self.actions.beginner = (None, create, copy, delete, None, zoom, zoom_in, zoom_out, fit_window, fit_width)
+        self.tools.clear()
+        
+        add_actions(self.tools, self.actions.beginner)
+        self.canvas.menus[0].clear()
+        add_actions(self.canvas.menus[0], self.actions.beginnerContext)
+
+        self.status_label = QtWidgets.QLabel()
+        self.status('%s started.' % TITLE)
+        self.status_label.setStyleSheet("padding-left:8px;background:rgba(86,104,118,255);color:black;font-weight:bold;")
+        
+        # Application state.
+        self.image = QtGui.QImage()
+        self.file_path = ustr(default_filename)
+        self.last_open_dir = None
+        self.recent_files = []
+        self.max_recent = 7
+        self.line_color = None
+        self.fill_color = None
+        self.zoom_level = 100
+        self.fit_window = False
+        # Add Chris
+        self.difficult = False
+
+        # Fix the compatible issue for qt4 and qt5. Convert the QStringList to python list
+        if settings.get(SETTING_RECENT_FILES):
+            if have_qstring():
+                recent_file_qstring_list = settings.get(SETTING_RECENT_FILES)
+                self.recent_files = [ustr(i) for i in recent_file_qstring_list]
+            else:
+                self.recent_files = recent_file_qstring_list = settings.get(SETTING_RECENT_FILES)
+
+        size = settings.get(SETTING_WIN_SIZE, QtCore.QSize(600, 500))
+        position = QtCore.QPoint(0, 0)
+        saved_position = settings.get(SETTING_WIN_POSE, position)
+        # Fix the multiple monitors issue
+        for i in range(QtWidgets.QApplication.desktop().screenCount()):
+            if QtWidgets.QApplication.desktop().availableGeometry(i).contains(saved_position):
+                position = saved_position
+                break
+        self.resize(size)
+        self.move(position)
+        self.last_open_dir = ustr(settings.get(SETTING_LAST_OPEN_DIR, None))
+        # self.restoreState(settings.get(SETTING_WIN_STATE, QtCore.QByteArray()))
+        Shape.line_color = self.line_color = QtGui.QColor(settings.get(SETTING_LINE_COLOR, DEFAULT_LINE_COLOR))
+        Shape.fill_color = self.fill_color = QtGui.QColor(settings.get(SETTING_FILL_COLOR, DEFAULT_FILL_COLOR))
+        self.canvas.set_drawing_color(self.line_color)
+        # Add chris
+        Shape.difficult = self.difficult
+
+        # Callbacks:
+        self.zoom_widget.valueChanged.connect(self.paint_canvas)
+
+        # Display cursor coordinates at the right of status bar
+        self.label_coordinates = QtWidgets.QLabel('')
+        # self.tools.addPermanentWidget(self.label_coordinates)
+        # Since loading the file may take some time, make sure it runs in the background.
+        # if self.file_path:
+        #     self.queue_event(partial(self.load_file, self.file_path or ""))
+        if isinstance(self.file_path, str):
+            self.load_file(self.file_path)
+        elif isinstance(self.file_path, np.ndarray):
+            self.load_image(self.file_path)
+            
+        layout = QtWidgets.QVBoxLayout()
+        footerHlayout = QtWidgets.QHBoxLayout()
+        footerHlayout.addWidget(self.status_label)
+        centralHlayout = QtWidgets.QHBoxLayout()
+        centralHlayout.addWidget(self.tools)
+        centralHlayout.addWidget(scroll)
+        layout.addLayout(centralHlayout)
+        layout.addLayout(footerHlayout)
+        self.setLayout(layout)
+        
+    def set_qdarkstyle(self):
+        self.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+
+    def setDebugLevel(self, level) :
+        self.debug.changelevel(level)
+        self.debug.debug("Change [ %s ] debug level." % TITLE )
+
+    # Support Functions #
+    def set_format(self, save_format):
+        if save_format == FORMAT_PASCALVOC:
+            self.actions.save_format.setText(FORMAT_PASCALVOC)
+            self.actions.save_format.setIcon(new_icon("format_voc"))
+            self.label_file_format = LabelFileFormat.PASCAL_VOC
+            LabelFile.suffix = XML_EXT
+
+        elif save_format == FORMAT_YOLO:
+            self.actions.save_format.setText(FORMAT_YOLO)
+            self.actions.save_format.setIcon(new_icon("format_yolo"))
+            self.label_file_format = LabelFileFormat.YOLO
+            LabelFile.suffix = TXT_EXT
+
+        elif save_format == FORMAT_CREATEML:
+            self.actions.save_format.setText(FORMAT_CREATEML)
+            self.actions.save_format.setIcon(new_icon("format_createml"))
+            self.label_file_format = LabelFileFormat.CREATE_ML
+            LabelFile.suffix = JSON_EXT
+
+    def change_format(self):
+        if self.label_file_format == LabelFileFormat.PASCAL_VOC:
+            self.set_format(FORMAT_YOLO)
+        elif self.label_file_format == LabelFileFormat.YOLO:
+            self.set_format(FORMAT_CREATEML)
+        elif self.label_file_format == LabelFileFormat.CREATE_ML:
+            self.set_format(FORMAT_PASCALVOC)
+        else:
+            raise ValueError('Unknown label file format.')
+
+    def no_shapes(self):
+        return not self.items_to_shapes
+
+    def set_clean(self):
+        self.actions.create.setEnabled(True)
+        
+    def queue_event(self, function):
+        QtCore.QTimer.singleShot(0, function)
+
+    def status(self, message):
+        self.status_label.setText(message)
+
+    def reset_state(self):
+        self.items_to_shapes.clear()
+        self.shapes_to_items.clear()
+        self.file_path = None
+        self.image_data = None
+        self.label_file = None
+        self.canvas.reset_state()
+        self.label_coordinates.clear()
+
+    def edit_label(self):
+        if not self.canvas.editing():
+            return
+        item = self.current_item()
+        if not item:
+            return
+        text = self.label_dialog.pop_up(item.text())
+        if text is not None:
+            item.setText(text)
+            item.setBackground(generate_color_by_text(text))
+            self.update_combo_box()
+            
+    def add_recent_file(self, file_path):
+        if file_path in self.recent_files:
+            self.recent_files.remove(file_path)
+        elif len(self.recent_files) >= self.max_recent:
+            self.recent_files.pop()
+        self.recent_files.insert(0, file_path)
+
+    def beginner(self):
+        return self._beginner
+
+    def advanced(self):
+        return not self.beginner()
+
+    def create_shape(self):
+        assert self.beginner()
+        self.canvas.set_editing(False)
+        self.actions.create.setEnabled(False)
+
+    def toggle_drawing_sensitive(self, drawing=True):
+        """In the middle of drawing, toggling between modes should be disabled."""
+        self.actions.editMode.setEnabled(not drawing)
+        if not drawing and self.beginner():
+            # Cancel creation.
+            self.debug.war('Cancel creation rect.')
+            self.canvas.set_editing(True)
+            self.canvas.restore_cursor()
+            self.actions.create.setEnabled(True)
+
+    def toggle_draw_mode(self, edit=True):
+        self.canvas.set_editing(edit)
+        self.actions.createMode.setEnabled(edit)
+        self.actions.editMode.setEnabled(not edit)
+
+    def toggle_draw_rectangles(self):
+        self.canvas.set_drawing_free_shape(self.draw_rectangles_option.isChecked())
+
+    def set_create_mode(self):
+        assert self.advanced()
+        self.toggle_draw_mode(False)
+
+    def set_edit_mode(self):
+        assert self.advanced()
+        self.toggle_draw_mode(True)
+
+    # React to canvas signals.
+    def shape_selection_changed(self, selected=False):
+        shape = self.canvas.selected_shape
+        if shape:
+            self.shapes_to_items[shape].setSelected(True)
+
+        self.actions.delete.setEnabled(selected)
+        self.actions.copy.setEnabled(selected)
+        self.actions.edit.setEnabled(selected)
+        self.actions.shapeLineColor.setEnabled(selected)
+        self.actions.shapeFillColor.setEnabled(selected)
+
+    def copy_selected_shape(self):
+        self.add_label(self.canvas.copy_selected_shape())
+        # fix copy and delete
+        self.shape_selection_changed(True)
+        
+    def add_label(self, shape):
+        if shape is None:
+            return
+        shape.paint_label = shape.label
+        item = HashableQListWidgetItem(shape.label)
+        item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+        item.setCheckState(QtCore.Qt.Checked)
+        item.setBackground(generate_color_by_text(shape.label))
+        self.items_to_shapes[item] = shape
+        self.shapes_to_items[shape] = item
+
+    def remove_label(self, shape):
+        if shape is None:
+            # print('rm empty label')
+            return
+        item = self.shapes_to_items[shape]
+        del self.shapes_to_items[shape]
+        del self.items_to_shapes[item]
+
+    def load_labels(self, shapes):
+        s = []
+        for label, points, line_color, fill_color, difficult in shapes:
+            shape = Shape(label=label)
+            for x, y in points:
+
+                # Ensure the labels are within the bounds of the image. If not, fix them.
+                x, y, snapped = self.canvas.snap_point_to_canvas(x, y)
+                shape.add_point(QtCore.QPointF(x, y))
+            shape.difficult = difficult
+            shape.close()
+            s.append(shape)
+
+            if line_color:
+                shape.line_color = QtGui.QtGui.QColor(*line_color)
+            else:
+                shape.line_color = generate_color_by_text(label)
+            
+            if fill_color:
+                shape.fill_color = QtGui.QtGui.QColor(*fill_color)
+            else:
+                shape.fill_color = generate_color_by_text(label)
+            self.add_label(shape)
+        self.canvas.load_shapes(s)
+        
+    def get_labels(self):
+        def format_shape(s):
+            return dict(label=s.label,
+                        line_color=s.line_color.getRgb(),
+                        fill_color=s.fill_color.getRgb(),
+                        points=[(p.x(), p.y()) for p in s.points],
+                        # add chris
+                        difficult=s.difficult)
+
+        shapes = []
+        for shape in self.canvas.shapes:
+            shape = format_shape(shape)
+            xmin, ymin, xmax, ymax = LabelFile.convert_points_to_bnd_box(shape["points"])
+            shapes.append([shape["label"], np.array([xmin, ymin, xmax-xmin, ymax-ymin]) ])
+        return shapes
+
+    # Callback functions:
+    def new_shape(self):
+        """Pop-up and give focus to the label editor.
+
+        position MUST be in global coordinates.
+        """
+        self.label_dialog = LabelDialog(
+            parent=self, list_item=self.label_hist)
+
+        text = self.label_dialog.pop_up(text=self.prev_label_text)
+        self.lastLabel = text
+            
+        # Add Chris
+        if text is not None:
+            self.prev_label_text = text
+            generate_color = generate_color_by_text(text)
+            shape = self.canvas.set_last_label(text, generate_color, generate_color)
+            self.add_label(shape)
+            if self.beginner():  # Switch to edit mode.
+                self.canvas.set_editing(True)
+                self.actions.create.setEnabled(True)
+            else:
+                self.actions.editMode.setEnabled(True)
+
+            if text not in self.label_hist:
+                self.label_hist.append(text)
+        else:
+            # self.canvas.undoLastLine()
+            self.canvas.reset_all_lines()
+
+    def scroll_request(self, delta, orientation):
+        units = - delta / (8 * 15)
+        bar = self.scroll_bars[orientation]
+        # bar.setValue(bar.value() + bar.singleStep() * units)
+        bar.setValue(int(bar.value() + bar.singleStep() * units))
+
+    def set_zoom(self, value):
+        self.zoom_mode = self.MANUAL_ZOOM
+        self.zoom_widget.setValue(value)
+
+    def add_zoom(self, increment=10):
+        self.set_zoom(self.zoom_widget.value() + increment)
+
+    def zoom_request(self, delta):
+        # get the current scrollbar positions
+        # calculate the percentages ~ coordinates
+        h_bar = self.scroll_bars[QtCore.Qt.Horizontal]
+        v_bar = self.scroll_bars[QtCore.Qt.Vertical]
+
+        # get the current maximum, to know the difference after zooming
+        h_bar_max = h_bar.maximum()
+        v_bar_max = v_bar.maximum()
+
+        # get the cursor position and canvas size
+        # calculate the desired movement from 0 to 1
+        # where 0 = move left
+        #       1 = move right
+        # up and down analogous
+        cursor = QtGui.QCursor()
+        pos = cursor.pos()
+        relative_pos = QtWidgets.QWidget.mapFromGlobal(self, pos)
+
+        cursor_x = relative_pos.x()
+        cursor_y = relative_pos.y()
+
+        w = self.scroll_area.width()
+        h = self.scroll_area.height()
+
+        # the scaling from 0 to 1 has some padding
+        # you don't have to hit the very leftmost pixel for a maximum-left movement
+        margin = 0.1
+        move_x = (cursor_x - margin * w) / (w - 2 * margin * w)
+        move_y = (cursor_y - margin * h) / (h - 2 * margin * h)
+
+        # clamp the values from 0 to 1
+        move_x = min(max(move_x, 0), 1)
+        move_y = min(max(move_y, 0), 1)
+
+        # zoom in
+        units = delta / (8 * 15)
+        scale = 10
+        self.add_zoom(scale * units)
+
+        # get the difference in scrollbar values
+        # this is how far we can move
+        d_h_bar_max = h_bar.maximum() - h_bar_max
+        d_v_bar_max = v_bar.maximum() - v_bar_max
+
+        # get the new scrollbar values
+        new_h_bar_value = h_bar.value() + move_x * d_h_bar_max
+        new_v_bar_value = v_bar.value() + move_y * d_v_bar_max
+
+        h_bar.setValue(new_h_bar_value)
+        v_bar.setValue(new_v_bar_value)
+
+    def set_fit_window(self, value=True):
+        if value:
+            self.actions.fitWidth.setChecked(False)
+        self.zoom_mode = self.FIT_WINDOW if value else self.MANUAL_ZOOM
+        self.adjust_scale()
+
+    def set_fit_width(self, value=True):
+        if value:
+            self.actions.fitWindow.setChecked(False)
+        self.zoom_mode = self.FIT_WIDTH if value else self.MANUAL_ZOOM
+        self.adjust_scale()
+
+    def counter_str(self):
+        """
+        Converts image counter to string representation.
+        """
+        return '[{} / {}]'.format(self.cur_img_idx + 1, self.img_count)
+
+    def resizeEvent(self, event):
+        if self.canvas and not self.image.isNull()\
+           and self.zoom_mode != self.MANUAL_ZOOM:
+            self.adjust_scale()
+        super(PainterDialog, self).resizeEvent(event)
+
+    def paint_canvas(self):
+        if self.image.isNull() :
+            self.debug.war("Cannot paint null image")
+        else :
+            assert not self.image.isNull(), "cannot paint null image"
+            self.canvas.scale = 0.01 * self.zoom_widget.value()
+            self.canvas.label_font_size = int(0.02 * max(self.image.width(), self.image.height()))
+            self.canvas.adjustSize()
+            self.canvas.update()
+
+    def adjust_scale(self, initial=False):
+        value = self.scalers[self.FIT_WINDOW if initial else self.zoom_mode]()
+        self.zoom_widget.setValue(int(100 * value))
+
+    def scale_fit_window(self):
+        """Figure out the size of the pixmap in order to fit the main widget."""
+        e = 2.0  # So that no scrollbars are generated.
+        w1 = self.width() - e
+        h1 = self.height() - e
+        a1 = w1 / h1
+        # Calculate a new scale value based on the pixmap's aspect ratio.
+        w2 = self.canvas.pixmap.width() - 0.0
+        h2 = self.canvas.pixmap.height() - 0.0
+        a2 = w2 / h2
+        return w1 / w2 if a2 >= a1 else h1 / h2
+
+    def scale_fit_width(self):
+        # The epsilon does not seem to work too well here.
+        w = self.width() - 2.0
+        return w / self.canvas.pixmap.width()
+
+    def closeEvent(self, event):
+        # self.dirty = True
+        if not self.may_continue():
+            event.ignore()
+
+    def load_image(self, img):
+        h, w, ch = img.shape
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_bytes = img.tobytes()
+        
+        qimg = QtGui.QImage(img_bytes, w, h, w * ch, QtGui.QImage.Format_RGB888) 
+        image = QtGui.QPixmap.fromImage(qimg)
+        if image.isNull():
+            self.status("Error reading image!")
+            return False
+        self.image = image
+        self.file_path = None
+        self.canvas.load_pixmap(image)
+        self.set_clean()
+        self.canvas.setEnabled(True)
+        self.adjust_scale(initial=True)
+        self.paint_canvas()
+        self.add_recent_file(self.file_path)
+        self.canvas.setFocus(True)
+        return True
+    
+    def load_file(self, file_path=None):
+        """Load the specified file, or the last opened file if None."""
+        self.reset_state()
+        self.canvas.setEnabled(False)
+        if file_path is None:
+            file_path = self.settings.get(SETTING_FILENAME)
+
+        # Make sure that filePath is a regular python string, rather than QString
+        file_path = ustr(file_path)
+
+        # Fix bug: An  index error after select a directory when open a new file.
+        unicode_file_path = ustr(file_path)
+        unicode_file_path = os.path.abspath(unicode_file_path)
+        
+        if unicode_file_path and os.path.exists(unicode_file_path):
+            if LabelFile.is_label_file(unicode_file_path):
+                try:
+                    self.label_file = LabelFile(unicode_file_path)
+                except LabelFileError as e:
+                    self.error_message(u'Error opening file',
+                                       (u"<p><b>%s</b></p>"
+                                        u"<p>Make sure <i>%s</i> is a valid label file.")
+                                       % (e, unicode_file_path))
+                    self.status("Error reading %s" % unicode_file_path)
+                    return False
+                self.image_data = self.label_file.image_data
+                self.line_color = QtGui.QColor(*self.label_file.lineColor)
+                self.fill_color = QtGui.QColor(*self.label_file.fillColor)
+                self.canvas.verified = self.label_file.verified
+            else:
+                # Load image:
+                # read data first and store for saving into label file.
+                self.image_data = read(unicode_file_path, None)
+                self.label_file = None
+                self.canvas.verified = False
+
+            if isinstance(self.image_data, QtGui.QImage):
+                image = self.image_data
+            else:
+                image = QtGui.QImage.fromData(self.image_data)
+            if image.isNull():
+                self.error_message(u'Error opening file',
+                                   u"<p>Make sure <i>%s</i> is a valid image file." % unicode_file_path)
+                self.status("Error reading %s" % unicode_file_path)
+                return False
+            self.status("Loaded %s" % os.path.basename(unicode_file_path))
+            self.image = image
+            self.file_path = unicode_file_path
+            self.canvas.load_pixmap(QtGui.QPixmap.fromImage(image))
+            if self.label_file:
+                self.load_labels(self.label_file.shapes)
+            self.set_clean()
+            self.canvas.setEnabled(True)
+            self.adjust_scale(initial=True)
+            self.paint_canvas()
+            self.add_recent_file(self.file_path)
+            counter = self.counter_str()
+            self.setWindowTitle(TITLE + ' ' + file_path + ' ' + counter)
+            self.canvas.setFocus(True)
+            return True
+        return False
+    
+    def open_file(self, _value=False):
+        if not self.may_continue():
+            return
+        path = os.path.dirname(ustr(self.file_path)) if self.file_path else '.'
+        formats = ['*.%s' % fmt.data().decode("ascii").lower() for fmt in QtGui.QImageReader.supportedImageFormats()]
+        filters = "Image & Label files (%s)" % ' '.join(formats + ['*%s' % LabelFile.suffix])
+        filename = QtWidgets.QFileDialog.getOpenFileName(self, '%s - Choose Image or Label file' % TITLE, path, filters)
+        if filename:
+            if isinstance(filename, (tuple, list)):
+                filename = filename[0]
+            self.cur_img_idx = 0
+            self.img_count = 1
+            self.load_file(filename)
+
+    def close_file(self, _value=False):
+        if not self.may_continue():
+            return
+        self.reset_state()
+        self.set_clean()
+        self.toggle_actions(False)
+        self.canvas.setEnabled(False)
+        self.actions.saveAs.setEnabled(False)
+
+    def reset_all(self):
+        self.settings.reset()
+        self.close()
+        process = QtCore.QProcess()
+        process.startDetached(os.path.abspath(__file__))
+
+    def may_continue(self):
+        if not self.dirty:
+            return True
+        else:
+            discard_changes = self.discard_changes_dialog()
+            if discard_changes == QtWidgets.QMessageBox.Yes:
+                # self.save_file()
+                return True
+            else:
+                return False
+
+    def discard_changes_dialog(self):
+        yes, cancel = QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel
+        msg = u"Are you sure you want to finish the modifications?"
+        return QtWidgets.QMessageBox.warning(self, u'Attention', msg, yes | cancel)
+
+    def error_message(self, title, message):
+        return QtWidgets.QMessageBox.critical(self, title,
+                                    '<p><b>%s</b></p>%s' % (title, message))
+
+    def current_path(self):
+        return os.path.dirname(self.file_path) if self.file_path else '.'
+
+    def choose_color1(self):
+        color = self.color_dialog.getColor(self.line_color, u'Choose line color',
+                                           default=DEFAULT_LINE_COLOR)
+        if color:
+            self.line_color = color
+            Shape.line_color = color
+            self.canvas.set_drawing_color(color)
+            self.canvas.update()
+
+    def delete_selected_shape(self):
+        self.remove_label(self.canvas.delete_selected())
+
+    def choose_shape_line_color(self):
+        color = self.color_dialog.getColor(self.line_color, u'Choose Line Color',
+                                           default=DEFAULT_LINE_COLOR)
+        if color:
+            self.canvas.selected_shape.line_color = color
+            self.canvas.update()
+
+    def choose_shape_fill_color(self):
+        color = self.color_dialog.getColor(self.fill_color, u'Choose Fill Color',
+                                           default=DEFAULT_FILL_COLOR)
+        if color:
+            self.canvas.selected_shape.fill_color = color
+            self.canvas.update()
+
+    def copy_shape(self):
+        self.canvas.end_move(copy=True)
+        self.add_label(self.canvas.selected_shape)
+
+    def move_shape(self):
+        self.canvas.end_move(copy=False)
+
+    def load_predefined_classes(self, predef_classes_file):
+        if os.path.exists(predef_classes_file) is True:
+            with codecs.open(predef_classes_file, 'r', 'utf8') as f:
+                for line in f:
+                    line = line.strip()
+                    if self.label_hist is None:
+                        self.label_hist = [line]
+                    else:
+                        self.label_hist.append(line)
+            self.classes_file = predef_classes_file
+        else :
+            self.classes_file = None
+
+    def load_bbox_by_list(self, bbox_list):
+        shapes = []
+        for label, box in bbox_list:
+            '''
+            box format: x, y, width, height
+            '''
+            x_min = int(box[0])
+            x_max = int(box[0] + box[2])
+            y_min = int(box[1])
+            y_max = int(box[1] + box[3])
+            points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
+            shapes.append((label, points, None, None, False))
+        self.debug.debug("List shape : " + str(shapes))
+        self.load_labels(shapes)
+        
+    def load_pascal_xml_by_filename(self, xml_path):
+        if self.file_path is None:
+            return
+        if os.path.isfile(xml_path) is False:
+            return
+
+        self.set_format(FORMAT_PASCALVOC)
+        
+        t_voc_parse_reader = PascalVocReader(xml_path) 
+        shapes = t_voc_parse_reader.get_shapes()
+        self.debug.debug("PascalVocReader shape : " + str(shapes))
+        self.load_labels(shapes) 
+        self.canvas.verified = t_voc_parse_reader.verified
+
+    def load_yolo_txt_by_filename(self, txt_path):
+        if self.file_path is None:
+            return
+        if os.path.isfile(txt_path) is False:
+            return
+
+        self.set_format(FORMAT_YOLO)
+        
+        t_yolo_parse_reader = YoloReader(txt_path, self.image, self.classes_file)
+        shapes = t_yolo_parse_reader.get_shapes()
+        self.debug.debug("YoloReader shape : " + str(shapes))
+        self.load_labels(shapes)
+        self.canvas.verified = t_yolo_parse_reader.verified
+
+    def load_create_ml_json_by_filename(self, json_path, file_path):
+        if self.file_path is None:
+            return
+        if os.path.isfile(json_path) is False:
+            return
+
+        self.set_format(FORMAT_CREATEML)
+        
+        create_ml_parse_reader = CreateMLReader(json_path, file_path)
+        shapes = create_ml_parse_reader.get_shapes()
+        self.debug.debug("CreateMLReader shape : " + str(shapes))
+        self.load_labels(shapes)
+        self.canvas.verified = create_ml_parse_reader.verified
+
+def read(filename, default=None):
+    try:
+        reader =  QtGui.QImageReader(filename)
+        reader.setAutoTransform(True)
+        return reader.read()
+    except:
+        return default
+
+if __name__ == '__main__':
+    """
+    Standard boilerplate Qt application code.
+    Do everything but app.exec_() -- so that we can test the application in one thread
+    """
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("-i", "--image_file", default="./demo/trackingSelectUI.png", nargs="?")
+    argparser.add_argument("-c", "--class_file",
+                           default= os.path.join(os.path.dirname(__file__), 'default_classes.txt'),
+                           nargs="?")
+    args = argparser.parse_args(sys.argv[1:])
+
+    args.image_file = args.image_file and os.path.normpath(args.image_file)
+    args.class_file = args.class_file and os.path.normpath(args.class_file)
+    # image = cv2.imread(args.image_file)
+
+    app = QtWidgets.QApplication(sys.argv)
+    win = PainterDialog(args.image_file,
+                     args.class_file,
+                     debug=debug)
+    win.set_qdarkstyle()
+    # win.load_bbox_by_list([ ["people", [59., 75., 170., 180.]] ])
+    win.exec()
+    print(win.get_labels())
+
