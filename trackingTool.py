@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from modules.labeling.libs.create_ml_io import JSON_EXT
 from modules.labeling.libs.pascal_voc_io import XML_EXT
 from modules.labeling.libs.yolo_io import TXT_EXT
+from modules.labeling.libs.utils import generate_color_by_text
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
 from modules.tracking.libs.fileDialog import FileDialog
 from modules.tracking.libs.painterDialog import PainterDialog
@@ -127,12 +128,8 @@ class ObjectTack(object):
                     else:
                         self.label_hist.append(line)
             self.classes_file = predef_classes_file
-            rng = np.random.default_rng()
-            self.classes_color = {label:rng.integers(low=0, high=255, size=3, dtype=np.uint8).tolist() 
-                                  for label in self.label_hist}
         else :
             self.classes_file = None
-            self.classes_color = None
 
     def initBox(self, src_frame: np.ndarray) -> None:
         """
@@ -267,7 +264,7 @@ if __name__ == '__main__':
                 tracker_list = tracker.update(image)
 
                 # write .jpg and .xml/txt to disk
-                if frame_index % interval_frame == 0 or motion.update(image):
+                if frame_index % interval_frame == 0 : #TODO: #or motion.update(image):
                     save_status = True
                     image_file_name = str(frame_index).rjust(5, '0') + '.jpg'
                     label_file_name = str(frame_index).rjust(5, '0') + TXT_EXT
@@ -291,16 +288,18 @@ if __name__ == '__main__':
                     #                                     shapes, 
                     #                                     str(images_dir_path.joinpath(image_file_name)), 
                     #                                     image)
-                motion.DrawMotionOnFrame(image)
+                    
+                # TODO: add motion UI
+                # motion.DrawMotionOnFrame(image)
                 # motion.DrawMotionHeatmap()
                 # draw tracker bboxs on image
-                for idx, (label, bbox) in enumerate(tracker_list):
+                for label, bbox in tracker_list:
                     sxsy = (int(bbox[0]), int(bbox[1]))
                     exey = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                    color = tracker.classes_color[label]
+                    color = generate_color_by_text(label, alpha=255)
 
-                    cv2.putText(image, str(idx) + " | " + label, (sxsy[0], sxsy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-                    cv2.rectangle(image, sxsy, exey, color, 2)
+                    cv2.putText(image, label, (sxsy[0], sxsy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (color.blue(), color.red(), color.green()), 3)
+                    cv2.rectangle(image, sxsy, exey, (color.blue(), color.red(), color.green()), 2)
                 image = cv2.resize(image, DISPLAT_SIZE)
                 
                 cv2.putText(image, f"{frame_index} / {end_frame} | Time: {round((time.time() - s)*1000, 2)} ms", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)

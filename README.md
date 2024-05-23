@@ -64,16 +64,18 @@ Note:
 
 - Keyboard operation:
 
-    | ID       | Describe            |
-    |----------|---------------------|
-    | Tab      |Enter Label Painter. |
-    | Esc      |Quit.                | 
+    | ID         | Describe            |
+    |------------|---------------------|
+    | Tab/Enter  |Enter Label Painter. |
+    | Esc        |Quit.                | 
 
     Label Painter
     | ID       | Describe             |
     |----------|----------------------|
     | w        |Create Box.           |
     | Delete   |Select Box and Delete.|
+    | Ctrl+C   |Copy the previous box.|
+    | Esc      |Exit Painter Mode.    |
 
 ***Manual Labeling Tool*** :
 ```bash

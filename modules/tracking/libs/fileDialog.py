@@ -237,9 +237,11 @@ class FileDialog(QtWidgets.QDialog):
         keyboardLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
         keyboardLabel.setMinimumHeight(20)
         keyboardVLayout.addWidget(keyboardLabel)
-        data = {"『Enter』" : "Create new bbox.", 
-                "『Delete』" : "Delete error bbox.",
-                "『Esc』" : "Quit program."}
+        data = {"『Tab』|『Enter』" : "Enter Label Painter.", 
+                "『Esc』" : "Quit program/Label Painter.",
+                "『W』" : "Create Box in Label Painter.",
+                "『Delete』" : "Select Box and Delete in Label Painter.",
+                "『Ctrl + C』" : "Select Box and Copy in Label Painter."}
         keyboardTableWidget = QtWidgets.QTableWidget(len(data), 2)
         keyboardTableWidget.setStyleSheet(TABLE_QSS)
         keyboardTableWidget.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -266,6 +268,7 @@ class FileDialog(QtWidgets.QDialog):
             
             newitem = QtWidgets.QTableWidgetItem(data[item])
             keyboardTableWidget.setItem(n,1, newitem)
+        keyboardTableWidget.resizeColumnsToContents()
         keyboardVLayout.addWidget(keyboardTableWidget)
         
         # ======================= Save Path ===========================

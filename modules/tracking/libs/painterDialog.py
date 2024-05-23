@@ -50,7 +50,6 @@ class WindowMixin(object):
         toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         if actions:
             add_actions(toolbar, actions)
-        # self.addToolBar(QtCore.Qt.LeftToolBarArea, toolbar)
         return toolbar
 
 class PainterDialog(QtWidgets.QDialog, WindowMixin):
@@ -75,13 +74,9 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.string_bundle = StringBundle.get_bundle()
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
 
-        # Save as Pascal voc xml
-        self.label_file_format = settings.get(SETTING_LABEL_FILE_FORMAT, LabelFileFormat.PASCAL_VOC)
-
         # For loading all image under a directory
         self.dir_name = None
         self.label_hist = []
-        self.last_open_dir = None
         self.cur_img_idx = 0
         self.img_count = 1
 
@@ -101,6 +96,12 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.prev_label_text = ''
 
         self.zoom_widget = ZoomWidget()
+        self.zoom_widget.valueChanged.connect(self.paint_canvas)
+        self.zoom_widget.setWhatsThis(
+            u"Zoom in or out of the image. Also accessible with"
+            " %s and %s from the canvas." % (format_shortcut("Ctrl+[-+]"),
+                                             format_shortcut("Ctrl+Wheel")))
+        self.zoom_widget.setEnabled(False)
         self.color_dialog = ColorDialog(parent=self)
         
         self.canvas = Canvas(parent=self)
@@ -121,11 +122,14 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.canvas.selectionChanged.connect(self.shape_selection_changed)
         self.canvas.drawingPolygon.connect(self.toggle_drawing_sensitive)
 
+        self.status_label = QtWidgets.QLabel()
+        self.status_label.setStyleSheet("padding-left:8px;background:rgba(86,104,118,255);color:black;font-weight:bold;")
+        self.status('%s started.' % TITLE)
         # self.setCentralWidget(scroll)
         
         action = partial(new_action, self)
         quit = action(get_str('quit'), self.close,
-                      'Ctrl+Q', 'quit', get_str('quitApp'))
+                      'Esc', 'quit', get_str('quitApp'))
         create_mode = action(get_str('crtBox'), self.set_create_mode,
                              'w', 'new', get_str('crtBoxDetail'), enabled=False)
         edit_mode = action(get_str('editBox'), self.set_edit_mode,
@@ -136,7 +140,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         delete = action(get_str('delBox'), self.delete_selected_shape,
                         'Delete', 'delete', get_str('delBoxDetail'), enabled=False)
         copy = action(get_str('dupBox'), self.copy_selected_shape,
-                      'Ctrl+D', 'copy', get_str('dupBoxDetail'),
+                      'Ctrl+C', 'copy', get_str('dupBoxDetail'),
                       enabled=False)
         color1 = action(get_str('boxLineColor'), self.choose_color1,
                         'Ctrl+L', 'color_line', get_str('boxLineColorDetail'))
@@ -152,12 +156,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         
         zoom = QtWidgets.QWidgetAction(self)
         zoom.setDefaultWidget(self.zoom_widget)
-        self.zoom_widget.setWhatsThis(
-            u"Zoom in or out of the image. Also accessible with"
-            " %s and %s from the canvas." % (format_shortcut("Ctrl+[-+]"),
-                                             format_shortcut("Ctrl+Wheel")))
-        self.zoom_widget.setEnabled(False)
-
         zoom_in = action(get_str('zoomin'), partial(self.add_zoom, 10),
                          'Ctrl++', 'zoom-in', get_str('zoominDetail'), enabled=False)
         zoom_out = action(get_str('zoomout'), partial(self.add_zoom, -10),
@@ -193,8 +191,8 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.draw_rectangles_option.triggered.connect(self.toggle_draw_rectangles)
         
         # Store actions for further handling.
-        self.actions = Struct(open=open, 
-                              lineColor=color1, create=create, delete=delete, edit=edit, copy=copy,
+        self.actions = Struct(open=open, lineColor=color1, 
+                              create=create, delete=delete, edit=edit, copy=copy,
                               createMode=create_mode, editMode=edit_mode, 
                               shapeLineColor=shape_line_color, shapeFillColor=shape_fill_color,
                               zoom=zoom, zoomIn=zoom_in, zoomOut=zoom_out, zoomOrg=zoom_org,
@@ -202,7 +200,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
                               zoomActions=zoom_actions,
                               beginner=(),
                               beginnerContext=(create, edit, copy, delete),)
-
+        self.actions.beginner = (None, create, copy, delete, None, zoom, zoom_in, zoom_out, fit_window, fit_width, None, quit)
         
         # Custom context menu for the canvas widget:
         add_actions(self.canvas.menus[0], self.actions.beginnerContext)
@@ -211,23 +209,15 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             action('&Move here', self.move_shape)))
         
         self.tools = self.toolbar('Tools')
-        self.actions.beginner = (None, create, copy, delete, None, zoom, zoom_in, zoom_out, fit_window, fit_width)
         self.tools.clear()
-        
         add_actions(self.tools, self.actions.beginner)
+        
         self.canvas.menus[0].clear()
         add_actions(self.canvas.menus[0], self.actions.beginnerContext)
 
-        self.status_label = QtWidgets.QLabel()
-        self.status('%s started.' % TITLE)
-        self.status_label.setStyleSheet("padding-left:8px;background:rgba(86,104,118,255);color:black;font-weight:bold;")
-        
         # Application state.
         self.image = QtGui.QImage()
         self.file_path = ustr(default_filename)
-        self.last_open_dir = None
-        self.recent_files = []
-        self.max_recent = 7
         self.line_color = None
         self.fill_color = None
         self.zoom_level = 100
@@ -235,15 +225,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         # Add Chris
         self.difficult = False
 
-        # Fix the compatible issue for qt4 and qt5. Convert the QStringList to python list
-        if settings.get(SETTING_RECENT_FILES):
-            if have_qstring():
-                recent_file_qstring_list = settings.get(SETTING_RECENT_FILES)
-                self.recent_files = [ustr(i) for i in recent_file_qstring_list]
-            else:
-                self.recent_files = recent_file_qstring_list = settings.get(SETTING_RECENT_FILES)
-
-        size = settings.get(SETTING_WIN_SIZE, QtCore.QSize(600, 500))
         position = QtCore.QPoint(0, 0)
         saved_position = settings.get(SETTING_WIN_POSE, position)
         # Fix the multiple monitors issue
@@ -251,18 +232,19 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             if QtWidgets.QApplication.desktop().availableGeometry(i).contains(saved_position):
                 position = saved_position
                 break
-        self.resize(size)
+
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        width = int(screen.width() * 0.8)
+        height = int(screen.height() * 0.8)
+        self.resize(width, height)
         self.move(position)
-        self.last_open_dir = ustr(settings.get(SETTING_LAST_OPEN_DIR, None))
+        self.adjust_scale()
+
         # self.restoreState(settings.get(SETTING_WIN_STATE, QtCore.QByteArray()))
+        Shape.difficult = self.difficult
         Shape.line_color = self.line_color = QtGui.QColor(settings.get(SETTING_LINE_COLOR, DEFAULT_LINE_COLOR))
         Shape.fill_color = self.fill_color = QtGui.QColor(settings.get(SETTING_FILL_COLOR, DEFAULT_FILL_COLOR))
         self.canvas.set_drawing_color(self.line_color)
-        # Add chris
-        Shape.difficult = self.difficult
-
-        # Callbacks:
-        self.zoom_widget.valueChanged.connect(self.paint_canvas)
 
         # Display cursor coordinates at the right of status bar
         self.label_coordinates = QtWidgets.QLabel('')
@@ -293,43 +275,16 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.debug.debug("Change [ %s ] debug level." % TITLE )
 
     # Support Functions #
-    def set_format(self, save_format):
-        if save_format == FORMAT_PASCALVOC:
-            self.actions.save_format.setText(FORMAT_PASCALVOC)
-            self.actions.save_format.setIcon(new_icon("format_voc"))
-            self.label_file_format = LabelFileFormat.PASCAL_VOC
-            LabelFile.suffix = XML_EXT
-
-        elif save_format == FORMAT_YOLO:
-            self.actions.save_format.setText(FORMAT_YOLO)
-            self.actions.save_format.setIcon(new_icon("format_yolo"))
-            self.label_file_format = LabelFileFormat.YOLO
-            LabelFile.suffix = TXT_EXT
-
-        elif save_format == FORMAT_CREATEML:
-            self.actions.save_format.setText(FORMAT_CREATEML)
-            self.actions.save_format.setIcon(new_icon("format_createml"))
-            self.label_file_format = LabelFileFormat.CREATE_ML
-            LabelFile.suffix = JSON_EXT
-
-    def change_format(self):
-        if self.label_file_format == LabelFileFormat.PASCAL_VOC:
-            self.set_format(FORMAT_YOLO)
-        elif self.label_file_format == LabelFileFormat.YOLO:
-            self.set_format(FORMAT_CREATEML)
-        elif self.label_file_format == LabelFileFormat.CREATE_ML:
-            self.set_format(FORMAT_PASCALVOC)
-        else:
-            raise ValueError('Unknown label file format.')
-
-    def no_shapes(self):
-        return not self.items_to_shapes
-
     def set_clean(self):
         self.actions.create.setEnabled(True)
-        
-    def queue_event(self, function):
-        QtCore.QTimer.singleShot(0, function)
+
+    def toggle_actions(self, value=True):
+        """Enable/Disable widgets which depend on an opened image."""
+        for z in self.actions.zoomActions:
+            z.setEnabled(value)
+
+    # def queue_event(self, function):
+    #     QtCore.QTimer.singleShot(0, function)
 
     def status(self, message):
         self.status_label.setText(message)
@@ -354,13 +309,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             item.setText(text)
             item.setBackground(generate_color_by_text(text))
             self.update_combo_box()
-            
-    def add_recent_file(self, file_path):
-        if file_path in self.recent_files:
-            self.recent_files.remove(file_path)
-        elif len(self.recent_files) >= self.max_recent:
-            self.recent_files.pop()
-        self.recent_files.insert(0, file_path)
 
     def beginner(self):
         return self._beginner
@@ -445,13 +393,14 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
                 x, y, snapped = self.canvas.snap_point_to_canvas(x, y)
                 shape.add_point(QtCore.QPointF(x, y))
             shape.difficult = difficult
+            shape.label_font_size = self.canvas.label_font_size
             shape.close()
             s.append(shape)
 
             if line_color:
                 shape.line_color = QtGui.QtGui.QColor(*line_color)
             else:
-                shape.line_color = generate_color_by_text(label)
+                shape.line_color = generate_color_by_text(label, alpha=255)
             
             if fill_color:
                 shape.fill_color = QtGui.QtGui.QColor(*fill_color)
@@ -491,8 +440,9 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         # Add Chris
         if text is not None:
             self.prev_label_text = text
-            generate_color = generate_color_by_text(text)
-            shape = self.canvas.set_last_label(text, generate_color, generate_color)
+            line_color = generate_color_by_text(text, alpha=255)
+            fill_color = generate_color_by_text(text)
+            shape = self.canvas.set_last_label(text, line_color, fill_color)
             self.add_label(shape)
             if self.beginner():  # Switch to edit mode.
                 self.canvas.set_editing(True)
@@ -601,7 +551,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         else :
             assert not self.image.isNull(), "cannot paint null image"
             self.canvas.scale = 0.01 * self.zoom_widget.value()
-            self.canvas.label_font_size = int(0.02 * max(self.image.width(), self.image.height()))
+            self.canvas.label_font_size = int(0.02 * min(self.image.width(), self.image.height()))
             self.canvas.adjustSize()
             self.canvas.update()
 
@@ -651,7 +601,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.canvas.setEnabled(True)
         self.adjust_scale(initial=True)
         self.paint_canvas()
-        self.add_recent_file(self.file_path)
+        self.toggle_actions(True)
         self.canvas.setFocus(True)
         return True
     
@@ -710,7 +660,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             self.canvas.setEnabled(True)
             self.adjust_scale(initial=True)
             self.paint_canvas()
-            self.add_recent_file(self.file_path)
+            self.toggle_actions(True)
             counter = self.counter_str()
             self.setWindowTitle(TITLE + ' ' + file_path + ' ' + counter)
             self.canvas.setFocus(True)
@@ -829,48 +779,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             shapes.append((label, points, None, None, False))
         self.debug.debug("List shape : " + str(shapes))
         self.load_labels(shapes)
-        
-    def load_pascal_xml_by_filename(self, xml_path):
-        if self.file_path is None:
-            return
-        if os.path.isfile(xml_path) is False:
-            return
-
-        self.set_format(FORMAT_PASCALVOC)
-        
-        t_voc_parse_reader = PascalVocReader(xml_path) 
-        shapes = t_voc_parse_reader.get_shapes()
-        self.debug.debug("PascalVocReader shape : " + str(shapes))
-        self.load_labels(shapes) 
-        self.canvas.verified = t_voc_parse_reader.verified
-
-    def load_yolo_txt_by_filename(self, txt_path):
-        if self.file_path is None:
-            return
-        if os.path.isfile(txt_path) is False:
-            return
-
-        self.set_format(FORMAT_YOLO)
-        
-        t_yolo_parse_reader = YoloReader(txt_path, self.image, self.classes_file)
-        shapes = t_yolo_parse_reader.get_shapes()
-        self.debug.debug("YoloReader shape : " + str(shapes))
-        self.load_labels(shapes)
-        self.canvas.verified = t_yolo_parse_reader.verified
-
-    def load_create_ml_json_by_filename(self, json_path, file_path):
-        if self.file_path is None:
-            return
-        if os.path.isfile(json_path) is False:
-            return
-
-        self.set_format(FORMAT_CREATEML)
-        
-        create_ml_parse_reader = CreateMLReader(json_path, file_path)
-        shapes = create_ml_parse_reader.get_shapes()
-        self.debug.debug("CreateMLReader shape : " + str(shapes))
-        self.load_labels(shapes)
-        self.canvas.verified = create_ml_parse_reader.verified
 
 def read(filename, default=None):
     try:
