@@ -8,25 +8,25 @@ import os
 import time
 import logging
 import argparse
+import codecs, sys
 import numpy as np
 import multiprocessing as mp
-import codecs, sys
 from typing import *
 from pathlib import Path
 from PyQt5 import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from concurrent.futures import ThreadPoolExecutor
 
+from modules.logger import Logger
+from modules.resources.resources  import *
 from modules.labeling.libs.create_ml_io import JSON_EXT
-from modules.labeling.libs.pascal_voc_io import XML_EXT
-from modules.labeling.libs.yolo_io import TXT_EXT
-from modules.labeling.libs.utils import generate_color_by_text
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
+from modules.labeling.libs.pascal_voc_io import XML_EXT
+from modules.labeling.libs.utils import generate_color_by_text
+from modules.labeling.libs.yolo_io import TXT_EXT
 from modules.tracking.libs.fileDialog import FileDialog
 from modules.tracking.libs.painterDialog import PainterDialog
 from modules.tracking.motion import MotionDetector
-from modules.resources.resources  import *
-from modules.logger import Logger
 
 debug = Logger(None, logging.INFO, logging.INFO )
 
@@ -181,7 +181,11 @@ class ObjectTack(object):
                     futures = [executor.submit(tracker.update, src_frame) for tracker in self.multiTracker]
                     results = [future.result() for future in futures]
                 for (label, box), (ret, _box) in zip(self.bbox_list, results):
-                    box[:] = _box
+                    xmin = int(max(0, _box[0]))
+                    ymin = int(max(0, _box[1]))
+                    xmax = int(min(_box[0] + _box[2], src_frame.shape[1]-1))
+                    ymax = int(min(_box[1] + _box[3], src_frame.shape[0]-1))
+                    box[:] = (xmin, ymin, xmax-xmin, ymax-ymin)
         return self.bbox_list
 
 if __name__ == '__main__':
@@ -235,7 +239,7 @@ if __name__ == '__main__':
         # open video handle
         cap = cv2.VideoCapture(str(video_path), cv2.CAP_FFMPEG) 
         start_frame = 0
-        end_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        end_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1)
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         ret, image = cap.retrieve()
 
@@ -306,4 +310,5 @@ if __name__ == '__main__':
                 save_text = "No Saving"
                 cv2.putText(image, "Saving" if save_status else "No Saving", (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255) if save_status else (0, 255, 0), 2)
                 cv2.imshow('Labeling Mode - ' + str(video_path.stem), image)
+        cv2.destroyAllWindows()
         debug.info('End prossiing [%s] video ...'  % video_path.stem)

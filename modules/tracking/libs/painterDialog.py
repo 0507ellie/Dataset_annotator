@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import sys
+import cv2
 import argparse
 import codecs
 import os.path
 import logging
-import sys
-import cv2
 import numpy as np
 from functools import partial
 from PyQt5 import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from typing import *
 
+from modules import qdarkstyle
+from modules.logger import Logger
+from modules.resources.resources  import *
 from modules.labeling.libs.canvas import Canvas
 from modules.labeling.libs.colorDialog import ColorDialog
 from modules.labeling.libs.constants import *
@@ -28,9 +31,6 @@ from modules.labeling.libs.ustr import ustr
 from modules.labeling.libs.utils import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.zoomWidget import ZoomWidget
-from modules import qdarkstyle
-from modules.resources.resources  import *
-from modules.logger import Logger
 
 TITLE = 'LabelPainter'
 debug = Logger(None, logging.INFO, logging.INFO )
@@ -422,6 +422,8 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         for shape in self.canvas.shapes:
             shape = format_shape(shape)
             xmin, ymin, xmax, ymax = LabelFile.convert_points_to_bnd_box(shape["points"])
+            if not self.image.isNull():
+                xmax, ymax = min(xmax, self.image.width()-1), min(ymax, self.image.height()-1)
             shapes.append([shape["label"], np.array([xmin, ymin, xmax-xmin, ymax-ymin]) ])
         return shapes
 
