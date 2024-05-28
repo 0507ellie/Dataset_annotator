@@ -39,12 +39,16 @@ Note:
 ***Tracking Labeling Tool*** :
 
 - Run :
+
     ```bash
     # methods 1: setting in the UI
     $ python trackingTool.py
     ```
+    
     * [<font color="yellow">Check Label Table</font>]: Check the label tags of classes.
+    
     * [<font color="yellow">Video Files List Path</font>]: Drag and drop video files into the field or use the Add Btn to add your own paths.
+    
     * [<font color="yellow">Save Path</font>]: Root path for saving, where a folder will be automatically created for each video.
     <p>
         <img src="./demo/trackingSelectUI.png" height=350px width=400px>
@@ -69,7 +73,9 @@ Note:
     | Tab/Enter  |Enter Label Painter. |
     | Esc        |Quit.                | 
 
+
     Label Painter
+
     | ID       | Describe             |
     |----------|----------------------|
     | w        |Create Box.           |
@@ -78,10 +84,12 @@ Note:
     | Esc      |Exit Painter Mode.    |
 
 ***Manual Labeling Tool*** :
+
 ```bash
 # methods 1: setting in the UI
 $ python labelingTool.py
 ```
+
 * [<font color="yellow">Open Directory</font>] : corresponds to the 'images' folder
 
 * [<font color="yellow">Change Saving Directory</font>] : corresponds to the 'labels' folder.
@@ -95,6 +103,7 @@ $ python labelingTool.py -i <path-to-image-dir> -c <path-to-txt-classes> -o <pat
 ```
 
 Description of CLI all arguments:
+
 - `--image_dir` : Path to the directory containing images.
 
 - `--class_file` : Path to the file containing class names.
