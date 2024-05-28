@@ -32,12 +32,13 @@ from modules.labeling.libs.ustr import ustr
 from modules.labeling.libs.utils import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.zoomWidget import ZoomWidget
+from modules.tracking.libs.tagBar import TagBar
 from modules import qdarkstyle
 from modules.resources.resources  import *
 from modules.logger import Logger
 
 # Bundles Python Application
-# pyinstaller --paths ./modules.labeling/ -F -w labelingTool.py --icon=./resources/icons/app.ico
+# pyinstaller --paths ./modules/ -F -w labelingTool.py --icon=./resources/icons/app.ico
 # run: ./labelingTool
 
 LABELGTING = 'LabelingTool'
@@ -92,7 +93,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         # For loading all image under a directory
         self.m_img_list = []
         self.dir_name = None
-        self.label_hist = []
         self.last_open_dir = None
         self.cur_img_idx = 0
         self.img_count = 1
@@ -105,10 +105,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.screencast = "https://youtu.be/p0nR2YsCY_U"
 
         # Load predefined classes to the list
-        self.load_predefined_classes(default_prefdef_class_file)
+        label_hist = self.load_predefined_classes(default_prefdef_class_file)
 
         # Main widgets and related state.
-        self.label_dialog = LabelDialog(parent=self, list_item=self.label_hist)
+        self.label_dialog = LabelDialog(parent=self, list_item=[])
 
         self.items_to_shapes = {}
         self.shapes_to_items = {}
@@ -188,8 +188,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.label_list.itemChanged.connect(self.label_item_changed)
         list_layout.addWidget(self.label_list)
 
-
-
         self.dock = QtWidgets.QDockWidget(get_str('boxLabelText'), self)
         self.dock.setObjectName(get_str('labels'))
         self.dock.setWidget(label_list_container)
@@ -212,6 +210,20 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.canvas.zoomRequest.connect(self.zoom_request)
         self.canvas.set_drawing_free_shape(True)
 
+        mainVLayout = QtWidgets.QVBoxLayout()
+        classHLayout = QtWidgets.QHBoxLayout()
+        self.tagLabel = QtWidgets.QLabel("Label Tags : ")
+        self.tagLabel.setStyleSheet("color : rgb(255, 255, 255);")
+        self.tagLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
+        self.tagLabel.setMinimumHeight(15)
+        classHLayout.addWidget(self.tagLabel)
+        self.tagLineEdit = TagBar(self)
+        self.tagLineEdit.load_tags(label_hist)
+        self.tagLineEdit.setStyleSheet(" margin: 0px; padding: 0px; background-color: rgb(27,29,35); border: 0.5px solid white; border-radius: 15px; color : rgb(200, 200, 200);" )
+        classHLayout.addWidget(self.tagLineEdit)
+        classHLayout.addStretch(1)
+        mainVLayout.addLayout(classHLayout)
+        
         scroll = QtWidgets.QScrollArea()
         scroll.setWidget(self.canvas)
         scroll.setWidgetResizable(True)
@@ -227,7 +239,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.canvas.selectionChanged.connect(self.shape_selection_changed)
         self.canvas.drawingPolygon.connect(self.toggle_drawing_sensitive)
 
-        self.setCentralWidget(scroll)
+        mainVLayout.addWidget(scroll)
+        central_widget = QtWidgets.QWidget()
+        central_widget.setLayout(mainVLayout)
+        self.setCentralWidget(central_widget)
+        # self.setCentralWidget(scroll)
+        
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.file_dock)
         
@@ -940,13 +957,13 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             elif self.label_file_format == LabelFileFormat.YOLO:
                 if annotation_file_path[-4:].lower() != ".txt":
                     annotation_file_path += TXT_EXT
-                self.label_file.save_yolo_format(annotation_file_path, shapes, self.file_path, self.image_data, self.label_hist,
+                self.label_file.save_yolo_format(annotation_file_path, shapes, self.file_path, self.image_data, self.tagLineEdit.tags,
                                                  self.line_color.getRgb(), self.fill_color.getRgb())
             elif self.label_file_format == LabelFileFormat.CREATE_ML:
                 if annotation_file_path[-5:].lower() != ".json":
                     annotation_file_path += JSON_EXT
                 self.label_file.save_create_ml_format(annotation_file_path, shapes, self.file_path, self.image_data,
-                                                      self.label_hist, self.line_color.getRgb(), self.fill_color.getRgb())
+                                                      self.tagLineEdit.tags, self.line_color.getRgb(), self.fill_color.getRgb())
             else:
                 self.label_file.save(annotation_file_path, shapes, self.file_path, self.image_data,
                                      self.line_color.getRgb(), self.fill_color.getRgb())
@@ -1005,10 +1022,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         position MUST be in global coordinates.
         """
         if not self.use_default_label_checkbox.isChecked() or not self.default_label_text_line.text():
-            if len(self.label_hist) > 0:
+            if len(self.tagLineEdit.tags) > 0:
                 self.label_dialog = LabelDialog(
-                    parent=self, list_item=self.label_hist)
-
+                    parent=self, list_item=self.tagLineEdit.tags)
+                self.label_dialog.edit.hide()
+                self.label_dialog.button_box.hide()
+        
             # Sync single class mode from PR#106
             if self.single_class_mode.isChecked() and self.lastLabel:
                 text = self.lastLabel
@@ -1031,9 +1050,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             else:
                 self.actions.editMode.setEnabled(True)
             self.set_dirty()
-
-            if text not in self.label_hist:
-                self.label_hist.append(text)
         else:
             # self.canvas.undoLastLine()
             self.canvas.reset_all_lines()
@@ -1671,17 +1687,19 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.set_dirty()
 
     def load_predefined_classes(self, predef_classes_file):
+        label_hist = None
         if os.path.exists(predef_classes_file) is True:
             with codecs.open(predef_classes_file, 'r', 'utf8') as f:
                 for line in f:
                     line = line.strip()
-                    if self.label_hist is None:
-                        self.label_hist = [line]
+                    if label_hist is None:
+                        label_hist = [line]
                     else:
-                        self.label_hist.append(line)
+                        label_hist.append(line)
             self.classes_file = predef_classes_file
         else :
             self.classes_file = None
+        return label_hist
 
     def load_pascal_xml_by_filename(self, xml_path):
         if self.file_path is None:

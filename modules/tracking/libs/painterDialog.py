@@ -435,7 +435,9 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         """
         self.label_dialog = LabelDialog(
             parent=self, list_item=self.label_hist)
-
+        self.label_dialog.edit.hide()
+        self.label_dialog.button_box.hide()
+        
         text = self.label_dialog.pop_up(text=self.prev_label_text)
         self.lastLabel = text
             
@@ -753,7 +755,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
 
     def move_shape(self):
         self.canvas.end_move(copy=False)
-
+    
     def load_predefined_classes(self, predef_classes_file):
         if os.path.exists(predef_classes_file) is True:
             with codecs.open(predef_classes_file, 'r', 'utf8') as f:

@@ -38,8 +38,10 @@ argparser.add_argument('-c','--class_file', default= os.path.join(os.path.dirnam
 argparser.add_argument('-o','--save_folder', default="temp", nargs="?",
                         help='Folder to save the labeled frames. Default is "temp".')
 DISPLAT_SIZE = (1280, 720)
-
+IMAGE_TAG = "images"
+LABEL_TAG = "labels"
 # #############################################
+
 class ObjectTack(object):
     def __init__(self, model: str = 'csrt', cpu_workers: int = 1):
         self.cv2_version = ''.join(cv2.__version__.split('.'))
@@ -189,8 +191,6 @@ class ObjectTack(object):
         return self.bbox_list
 
 if __name__ == '__main__':
-    IMAGE_TAG = "images"
-    LABEL_TAG = "labels"
     args = argparser.parse_args()
     app = QtWidgets.QApplication(sys.argv)
 

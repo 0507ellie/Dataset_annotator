@@ -1,8 +1,10 @@
 import os, sys, subprocess
+import codecs
 from PyQt5 import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pathlib import Path
 
+from .tagBar import TagBar
 from tracking.libs.style import TABLE_QSS, BTN_QSS
 
 class DragInWidget( QtWidgets.QListWidget):
@@ -65,14 +67,17 @@ class LoadingQWidget(QtWidgets.QWidget):
         self.itemLineEdit.setStyleSheet("QLineEdit{border : 1px solid lightdark; border-radius: 10px; background-color: rgb(27,29,35); color : rgb(200, 200, 200)}")
         additemHLayout.addWidget(self.itemLineEdit)
         self.selectBtn.setIcon(QtGui.QIcon(':/open')) 
+        self.selectBtn.setFocusPolicy(QtCore.Qt.NoFocus)
         self.selectBtn.setObjectName('QPushBtn_selectFolder')
         self.selectBtn.setStyleSheet(btn_layout_qss)
         self.selectBtn.setFixedSize(50, 30)
         additemHLayout.addWidget(self.selectBtn)
         self.addBtn.setStyleSheet(btn_layout_qss)
+        self.addBtn.setFocusPolicy(QtCore.Qt.NoFocus)
         self.addBtn.setFixedSize(60, 30)
         additemHLayout.addWidget(self.addBtn)
         self.removeBtn.setEnabled(False)
+        self.removeBtn.setFocusPolicy(QtCore.Qt.NoFocus)
         self.removeBtn.setStyleSheet(btn_layout_qss)
         self.removeBtn.setFixedSize(90, 30)
         additemHLayout.addWidget(self.removeBtn)
@@ -186,9 +191,10 @@ class FileDialog(QtWidgets.QDialog):
     def __init__(self, __appname__: str, class_path: str) -> None:
         super().__init__()
         self.app_name = __appname__
-        self.class_path = class_path
+        self.classes_file = class_path
         self.btn_trigger = False
-
+        label_hist = self.load_predefined_classes(self.classes_file)
+        
         self.setObjectName("MainWindow")
         self.setWindowTitle(self.app_name)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -200,17 +206,15 @@ class FileDialog(QtWidgets.QDialog):
         mainLayout = QtWidgets.QVBoxLayout()
         # ======================= Classes File ===========================
         classHLayout = QtWidgets.QHBoxLayout()
-        self.openLabel = QtWidgets.QLabel("Check Label Table : ")
-        self.openLabel.setStyleSheet("color : rgb(255, 255, 255);")
-        self.openLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
-        self.openLabel.setMinimumHeight(15)
-        classHLayout.addWidget(self.openLabel)
-        self.openBtn = QtWidgets.QPushButton("Open")
-        self.openBtn.setObjectName('QPushBtn_check')
-        self.openBtn.released.connect(self.__btnMonitor)
-        self.openBtn.setStyleSheet(BTN_QSS)
-        self.openBtn.setFixedSize(80, 25)
-        classHLayout.addWidget(self.openBtn)
+        self.tagLabel = QtWidgets.QLabel("Label Tags : ")
+        self.tagLabel.setStyleSheet("color : rgb(255, 255, 255);")
+        self.tagLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
+        self.tagLabel.setMinimumHeight(15)
+        classHLayout.addWidget(self.tagLabel)
+        self.tagLineEdit = TagBar(self)
+        self.tagLineEdit.load_tags(label_hist)
+        self.tagLineEdit.setStyleSheet(" margin: 0px; padding: 0px; background-color: rgb(27,29,35); border: 0.5px solid white; border-radius: 15px; color : rgb(200, 200, 200);" )
+        classHLayout.addWidget(self.tagLineEdit)
         classHLayout.addStretch(1)
 
         # ======================= Interval Frame ===========================
@@ -264,10 +268,10 @@ class FileDialog(QtWidgets.QDialog):
         for n, item in enumerate(data.keys()):
             newitem = QtWidgets.QTableWidgetItem(item)
             newitem.setTextAlignment(QtCore.Qt.AlignCenter)
-            keyboardTableWidget.setItem(n,0, newitem)
+            keyboardTableWidget.setItem(n, 0, newitem)
             
             newitem = QtWidgets.QTableWidgetItem(data[item])
-            keyboardTableWidget.setItem(n,1, newitem)
+            keyboardTableWidget.setItem(n, 1, newitem)
         keyboardTableWidget.resizeColumnsToContents()
         keyboardVLayout.addWidget(keyboardTableWidget)
         
@@ -282,6 +286,7 @@ class FileDialog(QtWidgets.QDialog):
         self.savePathLineEdit.setPlaceholderText("Select Folder Path")
         self.savePathLineEdit.setText(str(Path(__file__).resolve().parents[3]))
         self.savePathBtn = QtWidgets.QPushButton()
+        self.savePathBtn.setFocusPolicy(QtCore.Qt.NoFocus)
         self.savePathBtn.setIcon(QtGui.QIcon(':/open')) 
         self.savePathBtn.setObjectName('QPushBtn_selectFolder')
         self.savePathBtn.released.connect(self.__btnMonitor)
@@ -292,6 +297,7 @@ class FileDialog(QtWidgets.QDialog):
         savePathHLayout.addWidget(self.savePathBtn)
 
         self.nextBtn = QtWidgets.QPushButton("Next") 
+        self.nextBtn.setFocusPolicy(QtCore.Qt.NoFocus)
         self.nextBtn.setObjectName('QPushBtn_next') 
         self.nextBtn.released.connect(self.__btnMonitor)
         self.nextBtn.setStyleSheet(BTN_QSS)
@@ -310,9 +316,9 @@ class FileDialog(QtWidgets.QDialog):
         if (sendingBtn.objectName() == "QPushBtn_check") :
             platform = sys.platform
             if platform == "win32":
-                subprocess.call(['start', self.class_path], shell=True)
+                subprocess.call(['start', self.classes_file], shell=True)
             elif platform == "linux":
-                os.system('xdg-open %s'% self.class_path)
+                os.system('xdg-open %s'% self.classes_file)
 
         if (sendingBtn.objectName() == "QPushBtn_next") :
             self.btn_trigger = True
@@ -323,6 +329,24 @@ class FileDialog(QtWidgets.QDialog):
             if folder_path:
                 self.savePathLineEdit.setText(folder_path)
 
+    def save_predefined_classes(self, predef_classes_file):
+        if os.path.exists(predef_classes_file) is True:
+            with codecs.open(predef_classes_file, 'w', 'utf8') as f:
+                for tag in self.tagLineEdit.tags:
+                    f.write(tag+'\n')
+                    
+    def load_predefined_classes(self, predef_classes_file):
+        label_hist = []
+        if os.path.exists(predef_classes_file) is True:
+            with codecs.open(predef_classes_file, 'r', 'utf8') as f:
+                for line in f:
+                    line = line.strip()
+                    if label_hist == []:
+                        label_hist = [line]
+                    else:
+                        label_hist.append(line)
+        return label_hist
+    
     def getVideoList(self):
        return  [Path(item) for item in self.videoLoading.checkPath()]
 
