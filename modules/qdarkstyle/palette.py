@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """Base palette mixin."""
@@ -69,6 +68,7 @@ class Palette(object):
             'COLOR_ACCENT_2',
             'COLOR_ACCENT_3',
             'COLOR_ACCENT_4',
+            'COLOR_DISABLED',
             'OPACITY_TOOLTIP',
             'SIZE_BORDER_RADIUS',
             'BORDER_1',

@@ -11,18 +11,24 @@ from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
 from modules.labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
-# TODO: 
 
-root_dir: str = "./data/temp/"
-out_folder: str = "yolo"
-classes = ['people', 'cones']
+# TODO: 
+argparser = argparse.ArgumentParser(description='Convert LabelFileFormat')
+argparser.add_argument('-i','--root_dir',
+                        help='The path to the root directory contains an images/labels folder or \
+                              subdirectory contains images/labels folder.')
+argparser.add_argument('-c','--class_file', default= os.path.join(os.path.dirname(__file__), 'default_classes.txt'),
+                        help='Path to the file containing class names. Default is "default_classes.txt".')
+argparser.add_argument('-o','--save_folder', default="yolo", nargs="?",
+                        help='Folder to save the labeled frames. Default is "yolo".')
 
 IMAGE_TAG = "images"
 LABEL_TAG = "labels"
 
 class FormatConvert(object):
-    def __init__(self) -> None:
+    def __init__(self, class_file) -> None:
         self.label_file_format = None
+        self.load_predefined_classes(class_file)
         self.shapes = []
 
     @staticmethod
@@ -41,6 +47,17 @@ class FormatConvert(object):
         else :
             print(f"Images counts = {str(image_count)}, dir is empty!")
         return images_list
+
+    def load_predefined_classes(self, predef_classes_file: str) -> None:
+        self.classes = []
+        if os.path.exists(predef_classes_file) is True:
+            with codecs.open(predef_classes_file, 'r', 'utf8') as f:
+                for line in f:
+                    line = line.strip()
+                    if self.classes == []:
+                        self.classes = [line]
+                    else:
+                        self.classes.append(line)
 
     def read_annotation(self, input_label_dir, image_path):
         if not Path(input_label_dir).is_dir():
@@ -61,7 +78,7 @@ class FormatConvert(object):
             print("PascalVocReader shape : " + str(len(self.shapes)))
         elif os.path.isfile(txt_path):
             self.label_file_format = LabelFileFormat.YOLO
-            t_yolo_parse_reader = YoloReader(txt_path, image, classes) # TODO: classes
+            t_yolo_parse_reader = YoloReader(txt_path, image, self.classes)
             self.shapes = t_yolo_parse_reader.get_shapes()
             print("YoloReader shape : " + str(len(self.shapes)))
         elif os.path.isfile(json_path):
@@ -91,6 +108,11 @@ class FormatConvert(object):
             label_file.save_pascal_voc_format(xml_path, convert_shapes, image_path, image)    
 
 if __name__ == '__main__':
+    args = argparser.parse_args()
+    root_dir = args.root_dir
+    class_file = args.class_file
+    out_folder = args.save_folder
+    
     print(f"Root Dir: {Path(root_dir)}")
     single_folder = False
     sub_folders = [entry.name for entry in Path(root_dir).iterdir() if entry.is_dir()]
@@ -114,7 +136,7 @@ if __name__ == '__main__':
         # loading labels list
         print(f"Source label dir: {labels_dir_path}")
         print(f"Save label dir: {output_dir_path}")
-        converter = FormatConvert()
+        converter = FormatConvert(class_file)
         list_file = open(str(item_dir) + '.txt', 'w')
         for image_path in image_paths:
             list_file.write(image_path + '\n')

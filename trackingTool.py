@@ -37,7 +37,7 @@ argparser.add_argument('-c','--class_file', default= os.path.join(os.path.dirnam
                         help='Path to the file containing class names. Default is "default_classes.txt".')
 argparser.add_argument('-o','--save_folder', default="temp", nargs="?",
                         help='Folder to save the labeled frames. Default is "temp".')
-DISPLAT_SIZE = (1280, 720)
+
 IMAGE_TAG = "images"
 LABEL_TAG = "labels"
 # #############################################
@@ -193,7 +193,12 @@ class ObjectTack(object):
 if __name__ == '__main__':
     args = argparser.parse_args()
     app = QtWidgets.QApplication(sys.argv)
-
+    
+    DISPLAT_RATE = 0.66
+    desktop = QtWidgets.QApplication.desktop()
+    display_size = (int(desktop.width() * DISPLAT_RATE), 
+                    int(desktop.height() * DISPLAT_RATE))
+    
     if args.video_dir:
         interval_frame = 10
         ROOT_DIRS = args.video_dir
@@ -304,7 +309,7 @@ if __name__ == '__main__':
 
                     cv2.putText(image, label, (sxsy[0], sxsy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (color.blue(), color.red(), color.green()), 3)
                     cv2.rectangle(image, sxsy, exey, (color.blue(), color.red(), color.green()), 2)
-                image = cv2.resize(image, DISPLAT_SIZE)
+                image = cv2.resize(image, display_size)
                 
                 cv2.putText(image, f"{frame_index} / {end_frame} | Time: {round((time.time() - s)*1000, 2)} ms", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                 save_text = "No Saving"

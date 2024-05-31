@@ -18,6 +18,7 @@ class ComboBox(QWidget):
 
         layout = QHBoxLayout()
         self.cb = QComboBox()
+        self.cb.setStyleSheet("QLabel { font:16px Arial;}")
         self.items = items
         self.cb.addItems(self.items)
         self.status = "All"

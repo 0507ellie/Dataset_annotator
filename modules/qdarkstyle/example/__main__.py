@@ -1,4 +1,4 @@
-#!python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """Example of qdarkstyle use for Python and Qt applications.
@@ -11,8 +11,8 @@ Requirements:
 
     - Python 3
     - QtPy
-    - PyQt5 or PyQt4 or PySide2 or PySide
-    - PyQtGraph or Qt.Py (if choosen)
+    - PyQt6 or PyQt5 or PyQt4 or PySide6 or PySide2 or PySide
+    - PyQtGraph or Qt.Py (if chosen)
 
 To run this example using PyQt5, simple do
 
@@ -26,7 +26,9 @@ or
 
     python example.py  --qt_from=pyqt5
 
-Other options for qt_from are: pyqt5, pyside2, pyqt, pyside, qtpy, pyqtgraph, and qt.py.
+Other options for qt_from are: pyqt6, pyqt5, pyside6, pyside2, pyqt, pyside,
+qtpy, pyqtgraph, and qt.py.
+
 Also, you can run the example without any theme (none), to check for problems.
 
 .. code-block:: python
@@ -73,8 +75,8 @@ def main():
     parser.add_argument('--palette', default='dark', type=str,
                         choices=['dark', 'light', 'none'],
                         help="Palette to display. Using 'none' there is no style sheet applied, OS like.")
-    parser.add_argument('--qt_from', default='qtpy', type=str,
-                        choices=['pyqt5', 'pyqt', 'pyside2', 'pyside', 'qtpy', 'pyqtgraph', 'qt.py'],
+    parser.add_argument('--qt_from', default='pyqt5', type=str,
+                        choices=['pyqt6', 'pyqt5', 'pyqt', 'pyside6', 'pyside2', 'pyside', 'qtpy', 'pyqtgraph', 'qt.py'],
                         help="Choose which binding and/or abstraction is to be used to run the example. Default is 'qtpy'")
     parser.add_argument('--test', action='store_true',
                         help="Auto close window after 2s.")
@@ -93,7 +95,7 @@ def main():
         os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
     # Set QT_API variable before importing QtPy
-    if args.qt_from in ['pyqt', 'pyqt5', 'pyside', 'pyside2']:
+    if args.qt_from in ['pyqt', 'pyqt5', 'pyqt6', 'pyside', 'pyside2', 'pyside6']:
         os.environ['QT_API'] = args.qt_from
     elif args.qt_from == 'pyqtgraph':
         os.environ['QT_API'] = os.environ['PYQTGRAPH_QT_LIB']
@@ -140,6 +142,7 @@ def main():
     uic.loadUi(os.path.join(here, 'ui/mw_menus.ui'), window)
 
     title = ("QDarkStyle Example - ("
+             + f"Palette={args.palette}, "
              + f"QDarkStyle=v{qdarkstyle.__version__}, "
              + f"QtPy=v{QTPY_VERSION}, "
              + f"{API_NAME}=v{API_VERSION}, "
@@ -162,9 +165,9 @@ def main():
     uic.loadUi(os.path.join(here, 'ui/dw_buttons.ui'), dw_buttons)
     window.addDockWidget(QtCore.Qt.RightDockWidgetArea, dw_buttons)
 
-    # Set state indeterminate (value=1)
+    # Set state indeterminate #275
     dw_buttons.checkBoxTristate.stateChanged.connect(dw_buttons.checkBoxTristateDis.setCheckState)
-    dw_buttons.checkBoxTristate.setCheckState(1)
+    dw_buttons.checkBoxTristate.setCheckState(QtCore.Qt.PartiallyChecked)
 
     # Add actions on popup toolbuttons
     menu = QtWidgets.QMenu()

@@ -33,6 +33,7 @@ from modules.labeling.libs.utils import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.zoomWidget import ZoomWidget
 from modules.tracking.libs.tagBar import TagBar
+from modules.gdino import GroundingDINOAPIWrapper
 from modules import qdarkstyle
 from modules.resources.resources  import *
 from modules.logger import Logger
@@ -108,8 +109,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         label_hist = self.load_predefined_classes(default_prefdef_class_file)
 
         # Main widgets and related state.
-        self.label_dialog = LabelDialog(parent=self, list_item=[])
-
+        self.label_dialog = LabelDialog(parent=self, list_item=label_hist)
+        self.label_dialog.edit.hide()
+        self.label_dialog.button_box.hide()
+        
         self.items_to_shapes = {}
         self.shapes_to_items = {}
         self.prev_label_text = ''
@@ -598,7 +601,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
     def set_qdarkstyle(self):
         self.qdarkstyle = True
-        self.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+        self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
 
     def setDebugLevel(self, level) :
         self.debug.changelevel(level)
@@ -929,7 +932,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         # Add a null row for showing all the labels
         unique_text_list.append("All")
         unique_text_list.sort()
-
         self.combo_box.update_items(unique_text_list)
 
     def save_labels(self, annotation_file_path):
@@ -1209,6 +1211,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             counter = self.counter_str()
             self.setWindowTitle(LABELGTING + ' ' + file_path + ' ' + counter)
 
+            # TODO: auto detect
+            # gdino = GroundingDINOAPIWrapper("1253043b11a9c1e4c4da6d886a2ea847")
+            # prompts = dict(image=file_path, prompt='.'.join(self.tagLineEdit.tags))
+            # results = gdino.inference(prompts)
+            # print(results)
+        
             # Default : select last item if there is at least one item
             if self.label_list.count():
                 items = self.label_list.findItems(self.combo_box.status, Qt.MatchFixedString | Qt.MatchCaseSensitive)
@@ -1479,7 +1487,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         natural_sort(save_label_list, key=lambda x: x.lower())
         thumbnailview = ThumbnailView(read_image_list, save_label_list, parent=self) 
         if self.qdarkstyle : 
-            thumbnailview.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+            thumbnailview.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
         thumbnailview.exec()
         self.load_file(self.file_path)
         self.check_annotation_file_exist()
@@ -1791,7 +1799,7 @@ def get_main_app(argv=[]):
     app = QtWidgets.QApplication(argv)
     app.setApplicationName(LABELGTING)
     app.setWindowIcon(new_icon("app"))
-    app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     # Tzutalin 201705+: Accept extra agruments to change predefined class file
     argparser = argparse.ArgumentParser()
     argparser.add_argument("-i", "--image_dir", nargs="?")

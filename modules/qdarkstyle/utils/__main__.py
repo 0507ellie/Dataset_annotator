@@ -3,34 +3,29 @@
 
 The script will attempt to compile the qrc file using the following tools:
 
-    - pyrcc4 for PyQt4 and PyQtGraph (Python)
-    - pyrcc5 for PyQt5 and QtPy (Python)
-    - pyside-rcc for PySide (Python)
-    - pyside2-rcc for PySide2 (Python)
-    - rcc for Qt4 and Qt5 (C++)
+    - `pyside6-rcc` for PySide6 and QtPy (Python) (Official)
+    - There is no specific rcc compiler for PyQt6, use `pyside6-rcc` (Python)
+    - `pyrcc5` for PyQt5 (Python)
+    - `pyside2-rcc` for PySide2 (Python)
+    - `rcc` for Qt5/Qt6 (C++)
 
 Delete the compiled files that you don't want to use manually after
 running this script.
 
 Links to understand those tools:
 
-    - pyrcc4: http://pyqt.sourceforge.net/Docs/PyQt4/resources.html#pyrcc4
-    - pyrcc5: http://pyqt.sourceforge.net/Docs/PyQt5/resources.html#pyrcc5
-    - pyside-rcc: https://www.mankier.com/1/pyside-rcc
-    - pyside2-rcc: https://doc.qt.io/qtforpython/overviews/resources.html (Documentation Incomplete)
-    - rcc on Qt4: http://doc.qt.io/archives/qt-4.8/rcc.html
-    - rcc on Qt5: http://doc.qt.io/qt-5/rcc.html
+    - `pyside6-rcc`: https://doc.qt.io/qtforpython/tutorials/basictutorial/qrcfiles.html (Official)
+    - `pyrcc5`: http://pyqt.sourceforge.net/Docs/PyQt5/resources.html#pyrcc5
+    - `pyside2-rcc: https://doc.qt.io/qtforpython/overviews/resources.html (Documentation Incomplete)
+    - `rcc` on Qt6: https://doc.qt.io/qt-6/resources.html
+    - `rcc` on Qt5: http://doc.qt.io/qt-5/rcc.html
 
 """
 
 # Standard library imports
-from __future__ import absolute_import, print_function
-
 import argparse
-import glob
-import os
+import logging
 import sys
-from subprocess import call
 
 # Third party imports
 from watchdog.events import FileSystemEventHandler
@@ -40,10 +35,9 @@ from watchdog.observers import Observer
 from qdarkstyle import PACKAGE_PATH
 from qdarkstyle.dark.palette import DarkPalette
 from qdarkstyle.light.palette import LightPalette
-from qdarkstyle.utils import run_process
-from qdarkstyle.utils.images import (create_images, create_palette_image,
-                                     generate_qrc_file)
-from qdarkstyle.utils.scss import create_qss
+from qdarkstyle.utils import process_palette
+
+_logger = logging.getLogger(__name__)
 
 
 class QSSFileHandler(FileSystemEventHandler):
@@ -57,7 +51,8 @@ class QSSFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         """Handle file system events."""
         if event.src_path.endswith('.qss'):
-            run_process(self.args)
+            # TODO: needs implementation for new palettes
+            process_palette(compile_for=self.args.create)
             print('\n')
 
 
@@ -71,7 +66,7 @@ def main():
                         help="QRC file directory, relative to current directory.",)
     parser.add_argument('--create',
                         default='qtpy',
-                        choices=['pyqt', 'pyqt5', 'pyside', 'pyside2', 'qtpy', 'pyqtgraph', 'qt', 'qt5', 'all'],
+                        choices=['pyqt5', 'pyqt6', 'pyside2', 'pyside6', 'qtpy', 'pyqtgraph', 'qt', 'qt5', 'all'],
                         type=str,
                         help="Choose which one would be generated.")
     parser.add_argument('--watch', '-w',
@@ -93,8 +88,9 @@ def main():
         observer.join()
     else:
         for palette in [DarkPalette, LightPalette]:
-            run_process(args, palette)
+            process_palette(palette=palette, compile_for=args.create)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     sys.exit(main())
