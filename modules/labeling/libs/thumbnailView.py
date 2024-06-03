@@ -1,7 +1,7 @@
 try:
-	from PyQt5.QtGui import *
-	from PyQt5.QtCore import *
-	from PyQt5.QtWidgets import *
+    from qtpy.QtGui import *
+    from qtpy.QtCore import *
+    from qtpy.QtWidgets import *
 except ImportError:
 	from PyQt4.QtGui import *
 	from PyQt4.QtCore import *
@@ -119,7 +119,7 @@ class ThumbnailInfo:
 	
 class Worker(QThread):
 
-	progressBarValue = pyqtSignal(int)  # 更新进度条
+	progressBarValue = Signal(int)  # 更新进度条
 
 	def __init__(self):
 		super(Worker, self).__init__()
@@ -352,12 +352,10 @@ class ThumbnailView(QDialog):
 		self.debug.info("Final delete count = " + str(num))
 		if (num > 0) :
 			progress = QProgressDialog(self)
-			# progress.setWindowFlags(Qt.FramelessWindowHint)
-			# progress.setWindowModality(Qt.WindowModal)
 			progress.setStyleSheet(PROGRESS_QSS)
 			progress.setFixedSize(500, 100)
-			progress.setWindowTitle("請稍等")  
-			progress.setLabelText("正在刪除 ...")
+			progress.setWindowTitle("Please Wait")  
+			progress.setLabelText("deleting ...")
 			progress.setCancelButtonText("Cancel")
 			progress.setMinimumDuration(5)
 			progress.setWindowModality(Qt.WindowModal)
@@ -479,8 +477,8 @@ class ThumbnailView(QDialog):
 		event.accept()
 
 class QClickableImage(QWidget):
-	leftClicked = pyqtSignal(str, object)
-	rightClicked = pyqtSignal(object)
+	leftClicked = Signal(str, object)
+	rightClicked = Signal(object)
 
 	def __init__(self,width =0,height =0, image_id: ThumbnailInfo = None):
 		QWidget.__init__(self)

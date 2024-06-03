@@ -3,8 +3,7 @@ import codecs
 import argparse
 from pathlib import Path
 from typing import List
-from PyQt5 import Qt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from modules.labeling.libs.ustr import ustr
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
@@ -103,7 +102,7 @@ class FormatConvert(object):
         label_file = LabelFile()
         convert_shapes = [ dict(label=label, points=points, difficult=difficult) for label, points, _, _, difficult in self.shapes]
         if self.label_file_format != LabelFileFormat.YOLO:
-            label_file.save_yolo_format(txt_path, convert_shapes, image_path, image, classes)
+            label_file.save_yolo_format(txt_path, convert_shapes, image_path, image, self.classes)
         elif self.label_file_format != LabelFileFormat.PASCAL_VOC:
             label_file.save_pascal_voc_format(xml_path, convert_shapes, image_path, image)    
 

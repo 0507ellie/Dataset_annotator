@@ -17,6 +17,7 @@
 <file alias="quit">resources/icons/quit.png</file>
 <file alias="copy">resources/icons/copy.png</file>
 <file alias="edit">resources/icons/edit.png</file>
+<file alias="model">resources/icons/model.png</file>
 <file alias="open">resources/icons/open.png</file>
 <file alias="save">resources/icons/save.png</file>
 <file alias="thumbnail">resources/icons/thumbnail.png</file>

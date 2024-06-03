@@ -12,7 +12,7 @@ import locale
 from libs.ustr import ustr
 
 try:
-    from PyQt5.QtCore import *
+    from qtpy.QtCore import *
 except ImportError:
     if sys.version_info.major >= 3:
         import sip

@@ -1,6 +1,4 @@
-
-
-from PyQt5 import QtGui, QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from libs.shape import Shape
 from libs.utils import distance
@@ -15,12 +13,12 @@ CURSOR_GRAB = QtCore.Qt.OpenHandCursor
 # class Canvas(QGLWidget):
 
 class Canvas(QtWidgets.QWidget):
-    zoomRequest = QtCore.pyqtSignal(int)
-    scrollRequest = QtCore.pyqtSignal(int, int)
-    newShape = QtCore.pyqtSignal()
-    selectionChanged = QtCore.pyqtSignal(bool)
-    shapeMoved = QtCore.pyqtSignal()
-    drawingPolygon = QtCore.pyqtSignal(bool)
+    zoomRequest = QtCore.Signal(int)
+    scrollRequest = QtCore.Signal(int, int)
+    newShape = QtCore.Signal()
+    selectionChanged = QtCore.Signal(bool)
+    shapeMoved = QtCore.Signal()
+    drawingPolygon = QtCore.Signal(bool)
 
     CREATE, EDIT = list(range(2))
 

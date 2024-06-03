@@ -8,8 +8,7 @@ import os.path
 import logging
 import numpy as np
 from functools import partial
-from PyQt5 import Qt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from typing import *
 
 from modules import qdarkstyle
@@ -46,7 +45,7 @@ class WindowMixin(object):
     def toolbar(self, title, actions=None):
         toolbar = ToolBar(title)
         toolbar.setObjectName(u'%sToolBar' % title)
-        toolbar.setOrientation(Qt.Vertical)
+        # toolbar.setOrientation(QtCore.Qt.Vertical)
         toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         if actions:
             add_actions(toolbar, actions)
@@ -117,7 +116,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         }
         self.scroll_area = scroll
         self.canvas.scrollRequest.connect(self.scroll_request)
-
         self.canvas.newShape.connect(self.new_shape)
         self.canvas.selectionChanged.connect(self.shape_selection_changed)
         self.canvas.drawingPolygon.connect(self.toggle_drawing_sensitive)
@@ -129,45 +127,45 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         
         action = partial(new_action, self)
         quit = action(get_str('quit'), self.close,
-                      'Esc', 'quit', get_str('quitApp'))
+                      'Esc', 'quit', get_str('quitApp'), text_wrap=False)
         create_mode = action(get_str('crtBox'), self.set_create_mode,
-                             'w', 'new', get_str('crtBoxDetail'), enabled=False)
+                             'w', 'new', get_str('crtBoxDetail'), enabled=False, text_wrap=False)
         edit_mode = action(get_str('editBox'), self.set_edit_mode,
-                           'Ctrl+J', 'edit', get_str('editBoxDetail'), enabled=False)
+                           'Ctrl+J', 'edit', get_str('editBoxDetail'), enabled=False, text_wrap=False)
 
         create = action(get_str('crtBox'), self.create_shape,
-                        'w', 'new', get_str('crtBoxDetail'), enabled=False)
+                        'w', 'new', get_str('crtBoxDetail'), enabled=False, text_wrap=False)
         delete = action(get_str('delBox'), self.delete_selected_shape,
-                        'Delete', 'delete', get_str('delBoxDetail'), enabled=False)
+                        'Delete', 'delete', get_str('delBoxDetail'), enabled=False, text_wrap=False)
         copy = action(get_str('dupBox'), self.copy_selected_shape,
                       'Ctrl+C', 'copy', get_str('dupBoxDetail'),
-                      enabled=False)
+                      enabled=False, text_wrap=False)
         color1 = action(get_str('boxLineColor'), self.choose_color1,
                         'Ctrl+L', 'color_line', get_str('boxLineColorDetail'))
         edit = action(get_str('editLabel'), self.edit_label,
                       'Ctrl+E', 'edit', get_str('editLabelDetail'),
-                      enabled=False)
+                      enabled=False, text_wrap=False)
         shape_line_color = action(get_str('shapeLineColor'), self.choose_shape_line_color,
                                   icon='color_line', tip=get_str('shapeLineColorDetail'),
-                                  enabled=False)
+                                  enabled=False, text_wrap=False)
         shape_fill_color = action(get_str('shapeFillColor'), self.choose_shape_fill_color,
                                   icon='color', tip=get_str('shapeFillColorDetail'),
-                                  enabled=False)
+                                  enabled=False, text_wrap=False)
         
         zoom = QtWidgets.QWidgetAction(self)
         zoom.setDefaultWidget(self.zoom_widget)
         zoom_in = action(get_str('zoomin'), partial(self.add_zoom, 10),
-                         'Ctrl++', 'zoom-in', get_str('zoominDetail'), enabled=False)
+                         'Ctrl++', 'zoom-in', get_str('zoominDetail'), enabled=False, text_wrap=False)
         zoom_out = action(get_str('zoomout'), partial(self.add_zoom, -10),
-                          'Ctrl+-', 'zoom-out', get_str('zoomoutDetail'), enabled=False)
+                          'Ctrl+-', 'zoom-out', get_str('zoomoutDetail'), enabled=False, text_wrap=False)
         zoom_org = action(get_str('originalsize'), partial(self.set_zoom, 100),
-                          'Ctrl+=', 'zoom', get_str('originalsizeDetail'), enabled=False)
+                          'Ctrl+=', 'zoom', get_str('originalsizeDetail'), enabled=False, text_wrap=False)
         fit_window = action(get_str('fitWin'), self.set_fit_window,
                             'Ctrl+F', 'fit-window', get_str('fitWinDetail'),
-                            checkable=True, enabled=False)
+                            checkable=True, enabled=False, text_wrap=False)
         fit_width = action(get_str('fitWidth'), self.set_fit_width,
                            'Ctrl+Shift+F', 'fit-width', get_str('fitWidthDetail'),
-                           checkable=True, enabled=False)
+                           checkable=True, enabled=False, text_wrap=False)
         # Group zoom controls into a list for easier toggling.
         zoom_actions = (self.zoom_widget, zoom_in, zoom_out,
                         zoom_org, fit_window, fit_width)
@@ -182,13 +180,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         # Label list context menu.
         label_menu = QtWidgets.QMenu()
         add_actions(label_menu, (edit, delete))
-        
-        # Draw squares/rectangles
-        self.draw_rectangles_option = QtWidgets.QAction(get_str('drawRectangles'), self)
-        self.draw_rectangles_option.setShortcut('Ctrl+Shift+R')
-        self.draw_rectangles_option.setCheckable(False)
-        self.draw_rectangles_option.setChecked(settings.get(SETTING_DRAW_SQUARE, False))
-        self.draw_rectangles_option.triggered.connect(self.toggle_draw_rectangles)
         
         # Store actions for further handling.
         self.actions = Struct(open=open, lineColor=color1, 
@@ -260,10 +251,10 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         layout = QtWidgets.QVBoxLayout()
         footerHlayout = QtWidgets.QHBoxLayout()
         footerHlayout.addWidget(self.status_label)
-        centralHlayout = QtWidgets.QHBoxLayout()
-        centralHlayout.addWidget(self.tools)
-        centralHlayout.addWidget(scroll)
-        layout.addLayout(centralHlayout)
+        centralVlayout = QtWidgets.QVBoxLayout()
+        centralVlayout.addWidget(self.tools)
+        centralVlayout.addWidget(scroll)
+        layout.addLayout(centralVlayout)
         layout.addLayout(footerHlayout)
         self.setLayout(layout)
         
@@ -336,9 +327,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.actions.createMode.setEnabled(edit)
         self.actions.editMode.setEnabled(not edit)
 
-    def toggle_draw_rectangles(self):
-        self.canvas.set_drawing_free_shape(self.draw_rectangles_option.isChecked())
-
     def set_create_mode(self):
         assert self.advanced()
         self.toggle_draw_mode(False)
@@ -352,7 +340,9 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         shape = self.canvas.selected_shape
         if shape:
             self.shapes_to_items[shape].setSelected(True)
-
+            points = [[point.x(), point.y()] for point in shape.points]
+            self.status('Select - Width: %d, Height: %d '% (int(points[2][0] - points[0][0]), 
+                                                            int(points[2][1] - points[0][1])) )
         self.actions.delete.setEnabled(selected)
         self.actions.copy.setEnabled(selected)
         self.actions.edit.setEnabled(selected)
@@ -374,6 +364,9 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         item.setBackground(generate_color_by_text(shape.label))
         self.items_to_shapes[item] = shape
         self.shapes_to_items[shape] = item
+        points = [[point.x(), point.y()] for point in shape.points]
+        self.status('Add - Width: %d, Height: %d '% (int(points[2][0] - points[0][0]), 
+                                                     int(points[2][1] - points[0][1])) )
 
     def remove_label(self, shape):
         if shape is None:

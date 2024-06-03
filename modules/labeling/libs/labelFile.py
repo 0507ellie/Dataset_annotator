@@ -2,7 +2,7 @@
 # Create by TzuTaLin <tzu.ta.lin@gmail.com>
 
 try:
-    from PyQt5.QtGui import QImage
+    from qtpy.QtGui import QImage
 except ImportError:
     from PyQt4.QtGui import QImage
 

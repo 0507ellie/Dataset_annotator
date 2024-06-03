@@ -102,12 +102,11 @@ class GroundingDINOAPIWrapper:
             futures = [executor.submit(process_object, obj) for obj in result.objects]
             for future in concurrent.futures.as_completed(futures):
                 box, score, category, mask = future.result()
-                if score >=0.4:
-                    boxes.append(box)
-                    scores.append(score)
-                    categorys.append(category)
-                    if mask is not None:
-                        masks.append(mask)
+                boxes.append(box)
+                scores.append(score)
+                categorys.append(category)
+                if mask is not None:
+                    masks.append(mask)
 
         return dict(boxes=boxes, categorys=categorys, scores=scores, masks=masks)
 

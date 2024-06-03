@@ -1,7 +1,7 @@
 try:
-    from PyQt5.QtGui import *
-    from PyQt5.QtCore import *
-    from PyQt5.QtWidgets import *
+    from qtpy.QtGui import *
+    from qtpy.QtCore import *
+    from qtpy.QtWidgets import *
 except ImportError:
     from PyQt4.QtGui import *
     from PyQt4.QtCore import *
@@ -10,6 +10,15 @@ from libs.utils import new_icon, label_validator, trimmed
 
 BB = QDialogButtonBox
 
+class LabelQLineEdit(QLineEdit):
+    def setListWidget(self, list_widget):
+        self.list_widget = list_widget
+
+    def keyPressEvent(self, e):
+        if e.key() in [Qt.Key_Up, Qt.Key_Down]:
+            self.list_widget.keyPressEvent(e)
+        else:
+            super(LabelQLineEdit, self).keyPressEvent(e)
 
 class LabelDialog(QDialog):
 
@@ -17,7 +26,7 @@ class LabelDialog(QDialog):
         super(LabelDialog, self).__init__(parent)
         self.resize(300,200)
 
-        self.edit = QLineEdit()
+        self.edit = LabelQLineEdit()
         self.edit.setText(text)
         self.edit.setValidator(label_validator())
         self.edit.editingFinished.connect(self.post_process)
@@ -44,7 +53,7 @@ class LabelDialog(QDialog):
             self.list_widget.itemClicked.connect(self.list_item_click)
             self.list_widget.itemDoubleClicked.connect(self.list_item_double_click)
             layout.addWidget(self.list_widget)
-
+            self.edit.setListWidget(self.list_widget)
         self.setLayout(layout)
 
     def showEvent(self, event):

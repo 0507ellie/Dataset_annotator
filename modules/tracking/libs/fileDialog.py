@@ -1,7 +1,6 @@
 import os, sys, subprocess
 import codecs
-from PyQt5 import Qt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from pathlib import Path
 
 from .tagBar import TagBar

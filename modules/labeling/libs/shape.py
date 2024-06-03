@@ -3,8 +3,8 @@
 
 
 try:
-    from PyQt5.QtGui import *
-    from PyQt5.QtCore import *
+    from qtpy.QtGui import *
+    from qtpy.QtCore import *
 except ImportError:
     from PyQt4.QtGui import *
     from PyQt4.QtCore import *

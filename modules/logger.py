@@ -3,7 +3,8 @@
 #coding=gbk
 import logging
 import ctypes
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
+
 
 FOREGROUND_WHITE = "\x1b[38;20m"
 FOREGROUND_BLUE = "\x1b[34;20m" # text color contains blue.

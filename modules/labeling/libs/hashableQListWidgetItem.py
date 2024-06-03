@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 import sys
 try:
-    from PyQt5.QtGui import *
-    from PyQt5.QtCore import *
-    from PyQt5.QtWidgets import *
+    from qtpy.QtGui import *
+    from qtpy.QtCore import *
+    from qtpy.QtWidgets import *
 except ImportError:
     # needed for py3+qt4
     # Ref:

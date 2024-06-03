@@ -13,8 +13,7 @@ import numpy as np
 import multiprocessing as mp
 from typing import *
 from pathlib import Path
-from PyQt5 import Qt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from concurrent.futures import ThreadPoolExecutor
 
 from modules.logger import Logger

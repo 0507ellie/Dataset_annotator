@@ -5,9 +5,9 @@ import re
 import sys
 
 try:
-    from PyQt5.QtGui import *
-    from PyQt5.QtCore import *
-    from PyQt5.QtWidgets import *
+    from qtpy.QtGui import *
+    from qtpy.QtCore import *
+    from qtpy.QtWidgets import *
     QT5 = True
 except ImportError:
     from PyQt4.QtGui import *
@@ -29,10 +29,12 @@ def new_button(text, icon=None, slot=None):
 
 
 def new_action(parent, text, slot=None, shortcut=None, icon=None,
-               tip=None, checkable=False, enabled=True):
+               tip=None, checkable=False, enabled=True, text_wrap=True):
     """Create a new action and assign callbacks, shortcuts, etc."""
     a = QAction(text, parent)
     if icon is not None:
+        if text_wrap:
+            a.setIconText(text.replace(" ", "\n"))
         a.setIcon(new_icon(icon))
     if shortcut is not None:
         if isinstance(shortcut, (list, tuple)):

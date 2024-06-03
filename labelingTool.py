@@ -9,10 +9,8 @@ import shutil
 import sys
 import webbrowser as wb
 from functools import partial
-
-from PyQt5 import Qt
-from PyQt5 import QtCore, QtGui, QtWidgets
-# Note : run pyrcc5 -o modules/resources/resources.py modules/resources.qrc
+from qtpy import QtCore, QtGui, QtWidgets
+# Note : pyrcc5 -o modules/resources/resources.py modules/resources.qrc
 
 from modules.labeling.libs.canvas import Canvas
 from modules.labeling.libs.colorDialog import ColorDialog
@@ -31,22 +29,24 @@ from modules.labeling.libs.toolBar import ToolBar
 from modules.labeling.libs.ustr import ustr
 from modules.labeling.libs.utils import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
+from modules.labeling.libs.loadingWidget import LoadingExtension
 from modules.labeling.libs.zoomWidget import ZoomWidget
 from modules.tracking.libs.tagBar import TagBar
-from modules.gdino import GroundingDINOAPIWrapper
+from modules.gdino import InferenceThread
 from modules import qdarkstyle
 from modules.resources.resources  import *
 from modules.logger import Logger
+# qtpy pyright-config
 
 # Bundles Python Application
 # pyinstaller --paths ./modules/ -F -w labelingTool.py --icon=./resources/icons/app.ico
 # run: ./labelingTool
 
 LABELGTING = 'LabelingTool'
+LANGUAGE = "en" # ex: 'zh-TW', 'zh-CN', 'ja-JP'
 debug = Logger(None, logging.INFO, logging.INFO )
 
 class WindowMixin(object):
-
     def menu(self, title, actions=None):
         menu = self.menuBar().addMenu(title)
         if actions:
@@ -69,24 +69,20 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
     def __init__(self, default_filename=None, default_prefdef_class_file=None, default_save_dir=None, 
                  frozen_path=False, debug=None):
         super(MainWindow, self).__init__()
-        if (debug == None) :
-            self.debug = Logger(None, logging.INFO, logging.INFO )
-        else :
-            self.debug = debug
+        self.debug = Logger(None, logging.INFO, logging.INFO ) if (debug == None) else debug
         self.setWindowTitle(LABELGTING)
         self.setWindowIcon(QtGui.QIcon(':/LabelGTImg'))
+
         self.qdarkstyle = False
         # Load setting in the main thread
         self.settings = Settings()
         self.settings.load()
         settings = self.settings
 
-        self.os_name = platform.system()
-
         # Load string bundle for i18n
-        self.string_bundle = StringBundle.get_bundle()
+        self.string_bundle = StringBundle.get_bundle(LANGUAGE)
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
-
+        
         # Save as Pascal voc xml
         self.default_save_dir = default_save_dir
         self.label_file_format = settings.get(SETTING_LABEL_FILE_FORMAT, LabelFileFormat.PASCAL_VOC)
@@ -117,8 +113,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.shapes_to_items = {}
         self.prev_label_text = ''
 
-        list_layout = QtWidgets.QVBoxLayout()
-        list_layout.setContentsMargins(0, 0, 0, 0)
+        # ==================================================
+        #                   boxLabelText
+        # ==================================================
+        label_list_layout = QtWidgets.QVBoxLayout()
+        label_list_layout.setContentsMargins(0, 0, 0, 0)
+        label_list_layout.setSpacing(1)  # Adjust this value as needed
 
         # Create box size ratio
         use_box_size_qhbox_layout = QtWidgets.QHBoxLayout()
@@ -165,10 +165,20 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         use_default_label_container = QtWidgets.QWidget()
         use_default_label_container.setLayout(use_default_label_qhbox_layout)
 
-        # Add some of widgets to list_layout
-        list_layout.addWidget(use_box_size_container)
-        list_layout.addWidget(use_edit_label_container)
-        list_layout.addWidget(use_default_label_container)
+        # Create a widget for using auto model label
+        self.model_button = QtWidgets.QToolButton()
+        self.model_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.model_label = QtWidgets.QLabel("Overlap Rate:")
+        self.modelspbox = QtWidgets.QDoubleSpinBox() 
+        self.modelspbox.setValue(0.6)
+        self.modelspbox.setRange(0.1, 1)
+        self.modelspbox.setSingleStep(0.05) 
+        use_model_qhbox = QtWidgets.QHBoxLayout()
+        use_model_qhbox.addWidget(self.model_button, alignment=QtCore.Qt.AlignLeft)
+        use_model_qhbox.addWidget(self.model_label, alignment=QtCore.Qt.AlignLeft)
+        use_model_qhbox.addWidget(self.modelspbox, alignment=QtCore.Qt.AlignLeft)
+        use_model_container = QtWidgets.QWidget()
+        use_model_container.setLayout(use_model_qhbox)
 
         # Create and add combobox for showing unique labels in group
         use_display_label_qhbox_layout = QtWidgets.QHBoxLayout()
@@ -178,47 +188,80 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         use_display_label_qhbox_layout.addWidget(self.combo_box, QtCore.Qt.AlignLeft)
         use_display_label_container = QtWidgets.QWidget()
         use_display_label_container.setLayout(use_display_label_qhbox_layout)
-        list_layout.addWidget(use_display_label_container)
 
         # Create and add a widget for showing current label items
+        label_menu = QtWidgets.QMenu()
         self.label_list = QtWidgets.QListWidget()
-        label_list_container = QtWidgets.QWidget()
-        label_list_container.setLayout(list_layout)
+        self.label_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.label_list.itemActivated.connect(self.label_selection_changed)
         self.label_list.itemSelectionChanged.connect(self.label_selection_changed)
         self.label_list.itemDoubleClicked.connect(self.edit_label)
-        # Connect to itemChanged to detect checkbox changes.
         self.label_list.itemChanged.connect(self.label_item_changed)
-        list_layout.addWidget(self.label_list)
+        self.label_list.customContextMenuRequested.connect(self.pop_label_list_menu)
 
-        self.dock = QtWidgets.QDockWidget(get_str('boxLabelText'), self)
-        self.dock.setObjectName(get_str('labels'))
-        self.dock.setWidget(label_list_container)
+        # Add some of widgets to label_list_layout
+        label_list_layout.addWidget(use_box_size_container)
+        label_list_layout.addWidget(use_edit_label_container)
+        label_list_layout.addWidget(use_model_container)
+        label_list_layout.addWidget(use_default_label_container)
+        label_list_layout.addWidget(use_display_label_container)
+        label_list_layout.addWidget(self.label_list)
+        label_list_container = QtWidgets.QWidget()
+        label_list_container.setLayout(label_list_layout)
 
-        self.file_list_widget = QtWidgets.QListWidget()
-        self.file_list_widget.itemDoubleClicked.connect(self.file_item_double_clicked)
+        self.label_dock = QtWidgets.QDockWidget(get_str('boxLabelText'), self)
+        self.label_dock.setObjectName(get_str('labels'))
+        self.label_dock.setWidget(label_list_container)
+        self.dock_features = QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetFloatable
+        self.label_dock.setFeatures(self.dock_features)
+
+        # ==================================================
+        #                   File List
+        # ==================================================
         file_list_layout = QtWidgets.QVBoxLayout()
         file_list_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create and add a widget for showing file items
+        self.file_list_widget = QtWidgets.QListWidget()
+        self.file_list_widget.itemDoubleClicked.connect(self.file_item_double_clicked)
+
+        # Add some of widgets to file_list_layout
         file_list_layout.addWidget(self.file_list_widget)
         file_list_container = QtWidgets.QWidget()
         file_list_container.setLayout(file_list_layout)
+
         self.file_dock = QtWidgets.QDockWidget(get_str('fileList'), self)
         self.file_dock.setObjectName(get_str('files'))
         self.file_dock.setWidget(file_list_container)
 
+        # ==================================================
+        #                   Image Canvas
+        # ==================================================
         self.zoom_widget = ZoomWidget()
-        self.color_dialog = ColorDialog(parent=self)
-        
+        self.zoom_widget.setWhatsThis(
+            u"Zoom in or out of the image. Also accessible with"
+            " %s and %s from the canvas." % (format_shortcut("Ctrl+[-+]"),
+                                             format_shortcut("Ctrl+Wheel")))
+        self.zoom_widget.setEnabled(False)
+        self.zoom_widget.valueChanged.connect(self.paint_canvas)
+
         self.canvas = Canvas(parent=self)
         self.canvas.zoomRequest.connect(self.zoom_request)
+        self.canvas.scrollRequest.connect(self.scroll_request)
+        self.canvas.newShape.connect(self.new_shape)
+        self.canvas.shapeMoved.connect(self.set_dirty)
+        self.canvas.selectionChanged.connect(self.shape_selection_changed)
+        self.canvas.drawingPolygon.connect(self.toggle_drawing_sensitive)
         self.canvas.set_drawing_free_shape(True)
 
         mainVLayout = QtWidgets.QVBoxLayout()
+        mainVLayout.setContentsMargins(0, 2, 0, 0)
+        mainVLayout.setSpacing(2)
         classHLayout = QtWidgets.QHBoxLayout()
         self.tagLabel = QtWidgets.QLabel("Label Tags : ")
         self.tagLabel.setStyleSheet("color : rgb(255, 255, 255);")
         self.tagLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
-        self.tagLabel.setMinimumHeight(15)
+        self.tagLabel.setMinimumHeight(5)
         classHLayout.addWidget(self.tagLabel)
         self.tagLineEdit = TagBar(self)
         self.tagLineEdit.load_tags(label_hist)
@@ -235,52 +278,29 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             QtCore.Qt.Horizontal: scroll.horizontalScrollBar()
         }
         self.scroll_area = scroll
-        self.canvas.scrollRequest.connect(self.scroll_request)
-
-        self.canvas.newShape.connect(self.new_shape)
-        self.canvas.shapeMoved.connect(self.set_dirty)
-        self.canvas.selectionChanged.connect(self.shape_selection_changed)
-        self.canvas.drawingPolygon.connect(self.toggle_drawing_sensitive)
 
         mainVLayout.addWidget(scroll)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.label_dock)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.file_dock)
         central_widget = QtWidgets.QWidget()
         central_widget.setLayout(mainVLayout)
         self.setCentralWidget(central_widget)
         # self.setCentralWidget(scroll)
-        
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.file_dock)
-        
-        self.dock_features = QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetFloatable
-        self.dock.setFeatures(self.dock_features)
 
-        self.progress = QtWidgets.QProgressDialog(self)
-        self.progress.setStyleSheet("QLabel{font-family: 宋体;"
-                                "font-weight:bold;"
-                                "font-size:15px;"
-                                "color: silver;}"
-                                "QProgressBar{border: 1px solid grey;"         #外边框
-                                        "border-color:rgb(128, 128, 128);"     #外边框颜色
-                                        "text-align: center;"                  #字体对齐方式
-                                        "color: dimgrey;"
-                                        "background: rgb(255, 255, 255);}"
-                                "QProgressBar::chunk { border: none;"
-                                        "background: rgb(123, 199, 187);}"     #进度条颜色
-                                "QPushButton{max-width:100px;"                    #宽
-                                        "min-height:20px;"                        #高
-                                        "color: silver;"
-                                        "background-color:rgba(200,200,200,0.5);}"    #设置按钮为透明
-                            )
-        self.progress.setFixedSize(500, 80)
-        self.progress.setWindowTitle("请稍等")  
-        self.progress.setLabelText("正在读取 ...")
-        self.progress.setCancelButton(None)
-        self.progress.setMinimumDuration(5)
-        self.progress.setWindowModality(Qt.WindowModal)
-        self.progress.cancel()
-
-        # Actions
+        self.color_dialog = ColorDialog(parent=self)
+        # ==================================================
+        #                       Actions
+        # ==================================================
         action = partial(new_action, self)
+        edit = action(get_str('editLabel'), self.edit_label,
+                      'Ctrl+E', 'edit', get_str('editLabelDetail'),
+                      enabled=False, text_wrap=False)
+        self.edit_button.setDefaultAction(edit)
+        model = action(get_str('autoLabel'), self.auto_create_label,
+                      'Ctrl+M', 'model', get_str('autoLabelDetail'),
+                      enabled=False, text_wrap=False)
+        self.model_button.setDefaultAction(model)
+
         quit = action(get_str('quit'), self.close,
                       'Ctrl+Q', 'quit', get_str('quitApp'))
 
@@ -365,17 +385,15 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                           'Ctrl+A', 'hide', get_str('showAllBoxDetail'),
                           enabled=False)
 
-        help_default = action(get_str('tutorialDefault'), self.show_default_tutorial_dialog, None, 'help', get_str('tutorialDetail'))
-        show_info = action(get_str('info'), self.show_info_dialog, None, 'help', get_str('info'))
-        show_shortcut = action(get_str('shortcut'), self.show_shortcuts_dialog, None, 'help', get_str('shortcut'))
+        help_default = action(get_str('tutorialDefault'), self.show_default_tutorial_dialog, 
+                              None, 'help', get_str('tutorialDetail'))
+        show_info = action(get_str('info'), self.show_info_dialog, 
+                           None, 'help', get_str('info'))
+        show_shortcut = action(get_str('shortcut'), self.show_shortcuts_dialog, 
+                               None, 'help', get_str('shortcut'))
 
         zoom = QtWidgets.QWidgetAction(self)
         zoom.setDefaultWidget(self.zoom_widget)
-        self.zoom_widget.setWhatsThis(
-            u"Zoom in or out of the image. Also accessible with"
-            " %s and %s from the canvas." % (format_shortcut("Ctrl+[-+]"),
-                                             format_shortcut("Ctrl+Wheel")))
-        self.zoom_widget.setEnabled(False)
 
         zoom_in = action(get_str('zoomin'), partial(self.add_zoom, 10),
                          'Ctrl++', 'zoom-in', get_str('zoominDetail'), enabled=False)
@@ -392,7 +410,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         # Group zoom controls into a list for easier toggling.
         zoom_actions = (self.zoom_widget, zoom_in, zoom_out,
                         zoom_org, fit_window, fit_width)
-        self.zoom_mode = self.MANUAL_ZOOM
+        self.zoom_mode = self.FIT_WINDOW
         self.scalers = {
             self.FIT_WINDOW: self.scale_fit_window,
             self.FIT_WIDTH: self.scale_fit_width,
@@ -400,35 +418,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             self.MANUAL_ZOOM: lambda: 1,
         }
 
-        edit = action(get_str('editLabel'), self.edit_label,
-                      'Ctrl+E', 'edit', get_str('editLabelDetail'),
-                      enabled=False)
-        self.edit_button.setDefaultAction(edit)
-
         shape_line_color = action(get_str('shapeLineColor'), self.choose_shape_line_color,
                                   icon='color_line', tip=get_str('shapeLineColorDetail'),
                                   enabled=False)
         shape_fill_color = action(get_str('shapeFillColor'), self.choose_shape_fill_color,
                                   icon='color', tip=get_str('shapeFillColorDetail'),
                                   enabled=False)
-
-        labels = self.dock.toggleViewAction()
-        labels.setText(get_str('showHide'))
-        labels.setShortcut('Ctrl+Shift+L')
-
-        # Label list context menu.
-        label_menu = QtWidgets.QMenu()
-        add_actions(label_menu, (edit, delete))
-        self.label_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.label_list.customContextMenuRequested.connect(
-            self.pop_label_list_menu)
-
-        # Draw squares/rectangles
-        self.draw_rectangles_option = QtWidgets.QAction(get_str('drawRectangles'), self)
-        self.draw_rectangles_option.setShortcut('Ctrl+Shift+R')
-        self.draw_rectangles_option.setCheckable(False)
-        self.draw_rectangles_option.setChecked(settings.get(SETTING_DRAW_SQUARE, False))
-        self.draw_rectangles_option.triggered.connect(self.toggle_draw_rectangles)
 
         # Store actions for further handling.
         self.actions = Struct(save=save, save_format=save_format, saveAs=save_as, open=open, close=close, resetAll=reset_all, deleteImg=delete_image,
@@ -441,13 +436,11 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                               fileMenuActions=(
                                   open, open_dir, save, save_as, close, reset_all, quit),
                               beginner=(), advanced=(),
-                              editMenu=(edit, copy, delete,
-                                        None, color1, self.draw_rectangles_option),
+                              editMenu=(edit, copy, delete, None, color1),
                               beginnerContext=(create, edit, copy, delete),
                               advancedContext=(create_mode, edit_mode, edit, copy,
                                                delete, shape_line_color, shape_fill_color),
-                              onLoadActive=(
-                                  close, create, create_mode, edit_mode),
+                              onLoadActive=(close, create, model, create_mode, edit_mode),
                               onShapesPresent=(save_as, hide_all, show_all))
 
         self.menus = Struct(
@@ -457,23 +450,36 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             help=self.menu(get_str('menu_help')),
             recentFiles=QtWidgets.QMenu(get_str('menu_openRecent')),
             labelList=label_menu)
+        add_actions(label_menu, (edit, delete))
+        self.menus.file.aboutToShow.connect(self.update_file_menu)
 
         # Auto saving : Enable auto saving if pressing next
         self.auto_saving = QtWidgets.QAction(get_str('autoSaveMode'), self)
         self.auto_saving.setCheckable(True)
         self.auto_saving.setChecked(settings.get(SETTING_AUTO_SAVE, False))
         # Sync single class mode from PR#106
-        self.single_class_mode = QtWidgets.QAction(get_str('singleClsMode'), self)
-        self.single_class_mode.setShortcut("Ctrl+Shift+S")
-        self.single_class_mode.setCheckable(True)
-        self.single_class_mode.setChecked(settings.get(SETTING_SINGLE_CLASS, False))
-        self.lastLabel = None
+        # self.single_class_mode = QtWidgets.QAction(get_str('singleClsMode'), self)
+        # self.single_class_mode.setShortcut("Ctrl+Shift+S")
+        # self.single_class_mode.setCheckable(True)
+        # self.single_class_mode.setChecked(settings.get(SETTING_SINGLE_CLASS, False))
+        # self.lastLabel = None
         # Add option to enable/disable labels being displayed at the top of bounding boxes
         self.display_label_option = QtWidgets.QAction(get_str('displayLabel'), self)
         self.display_label_option.setShortcut("Ctrl+Shift+P")
         self.display_label_option.setCheckable(True)
         self.display_label_option.setChecked(settings.get(SETTING_PAINT_LABEL, False))
         self.display_label_option.triggered.connect(self.toggle_paint_labels_option)
+        # Draw squares/rectangles
+        self.draw_rectangles_option = QtWidgets.QAction(get_str('drawRectangles'), self)
+        self.draw_rectangles_option.setCheckable(True)
+        self.draw_rectangles_option.setShortcut('Ctrl+Shift+R')
+        self.draw_rectangles_option.setChecked(settings.get(SETTING_DRAW_SQUARE, False))
+        self.draw_rectangles_option.triggered.connect(self.toggle_draw_rectangles)
+        # Show/Hide Label Panel
+        labels = self.label_dock.toggleViewAction()
+        labels.setText(get_str('showHide'))
+        labels.setShortcut('Ctrl+Shift+L')
+        labels.setCheckable(True)
 
         if (frozen_path) :
             add_actions(self.menus.file,
@@ -484,14 +490,13 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         add_actions(self.menus.help, (help_default, show_info, show_shortcut))
         add_actions(self.menus.view, (
             self.auto_saving,
-            self.single_class_mode,
+            # self.single_class_mode,
             self.display_label_option,
+            self.draw_rectangles_option,
             labels, advanced_mode, None,
             hide_all, show_all, None,
             zoom_in, zoom_out, zoom_org, None,
             fit_window, fit_width))
-
-        self.menus.file.aboutToShow.connect(self.update_file_menu)
 
         # Custom context menu for the canvas widget:
         add_actions(self.canvas.menus[0], self.actions.beginnerContext)
@@ -533,8 +538,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.fill_color = None
         self.zoom_level = 100
         self.fit_window = False
-        # Add Chris
-        self.difficult = False
 
         # Fix the compatible issue for qt4 and qt5. Convert the QStringList to python list
         if settings.get(SETTING_RECENT_FILES):
@@ -566,7 +569,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         Shape.fill_color = self.fill_color = QtGui.QColor(settings.get(SETTING_FILL_COLOR, DEFAULT_FILL_COLOR))
         self.canvas.set_drawing_color(self.line_color)
         # Add chris
-        Shape.difficult = self.difficult
+        Shape.difficult = False
 
         def xbool(x):
             if isinstance(x, QtCore.QVariant):
@@ -585,9 +588,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             self.queue_event(partial(self.import_dir_images, self.file_path or ""))
         elif self.file_path:
             self.queue_event(partial(self.load_file, self.file_path or ""))
-
-        # Callbacks:
-        self.zoom_widget.valueChanged.connect(self.paint_canvas)
 
         self.populate_mode_actions()
 
@@ -649,9 +649,9 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if value:
             self.actions.createMode.setEnabled(True)
             self.actions.editMode.setEnabled(False)
-            self.dock.setFeatures(self.dock.features() | self.dock_features)
+            self.label_dock.setFeatures(self.label_dock.features() | self.dock_features)
         else:
-            self.dock.setFeatures(self.dock.features() ^ self.dock_features)
+            self.label_dock.setFeatures(self.label_dock.features() ^ self.dock_features)
 
     def populate_mode_actions(self):
         if self.beginner():
@@ -734,7 +734,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
         if browser.lower() == 'default':
             wb.open(link, new=2)
-        elif browser.lower() == 'chrome' and self.os_name == 'Windows':
+        elif browser.lower() == 'chrome' and platform.system() == 'Windows':
             if shutil.which(browser.lower()):  # 'chrome' not in wb._browsers in windows
                 wb.register('chrome', None, wb.BackgroundBrowser('chrome'))
             else:
@@ -819,6 +819,60 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             item.setBackground(generate_color_by_text(text))
             self.set_dirty()
             self.update_combo_box()
+
+    def auto_create_label(self):
+        if self.file_path != None:
+            self.loading = LoadingExtension(self)
+            self.loading.startLoading()
+
+            prompts = dict(image=self.file_path, prompt='.'.join(self.tagLineEdit.tags))
+            self._thread = InferenceThread(prompts)
+            self._thread.inferenceFinished.connect(self.auto_label_result)
+            self._thread.start()
+
+    def auto_label_result(self, data):
+        self.loading.loadingFinished()
+        self._thread.quit()
+        self._thread.wait()
+        self._thread = None
+
+        def format_shape(s):
+            return [s.label, [(p.x(), p.y()) for p in s.points], s.line_color.getRgb(), s.fill_color.getRgb(), s.difficult]
+
+        def similarity(box1, box2) -> float:
+            # Calculate the upper left and lower right coordinates of the intersection
+            x1 = max(box1[0][0], box2[0][0])
+            y1 = max(box1[1][1], box2[1][1])
+            x2 = min(box1[2][0], box2[2][0])
+            y2 = min(box1[2][1], box2[2][1])
+            w1, h1 = (box1[2][0] - box1[0][0]), (box1[2][1] - box1[0][1])
+            w2, h2 = (box2[2][0] - box2[0][0]), (box2[2][1] - box2[0][1])
+            # Calculate intersection area
+            intersection_area = max(0, x2 - x1 + 1) * max(0, y2 - y1 + 1)
+            
+            # Calculate the area of two boxes
+            box1_area = (w1 + 1) * (h1 + 1)
+            box2_area = (w2 + 1) * (h2 + 1)
+            
+            return intersection_area / float(box1_area + box2_area - intersection_area)
+        
+        if "error" not in data.keys():
+            shapes = [format_shape(shape) for shape in self.canvas.shapes]
+            for box, category, score in zip(data['boxes'], data['categorys'], data['scores']):
+                x_min, y_min, x_max, y_max = map(int, box)
+                points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
+                new_shape = [category, points, None, None, False]
+
+                # Determine whether the new shape is similar to an existing shape
+                similar_shapes = [shape for shape in shapes if similarity(shape[1], new_shape[1]) > self.modelspbox.value()]
+                if not similar_shapes:
+                    shapes.append(new_shape)
+            self.label_list.clear()
+            self.load_labels(shapes)
+            self.set_clean()
+            self.set_dirty()
+        else:
+            self.statusBar().showMessage("Auto detect timed out. Please try again later.")
 
     # Tzutalin 20160906 : Add file list and dock to move faster
     def file_item_double_clicked(self, item=None):
@@ -913,12 +967,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             s.append(shape)
 
             if line_color:
-                shape.line_color = QtGui.QtGui.QColor(*line_color)
+                shape.line_color = QtGui.QColor(*line_color)
             else:
                 shape.line_color = generate_color_by_text(label)
             
             if fill_color:
-                shape.fill_color = QtGui.QtGui.QColor(*fill_color)
+                shape.fill_color = QtGui.QColor(*fill_color)
             else:
                 shape.fill_color = generate_color_by_text(label)
             self.add_label(shape)
@@ -1031,11 +1085,11 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                 self.label_dialog.button_box.hide()
         
             # Sync single class mode from PR#106
-            if self.single_class_mode.isChecked() and self.lastLabel:
-                text = self.lastLabel
-            else:
-                text = self.label_dialog.pop_up(text=self.prev_label_text)
-                self.lastLabel = text
+            # if self.single_class_mode.isChecked() and self.lastLabel:
+            #     text = self.lastLabel
+            # else:
+            text = self.label_dialog.pop_up(text=self.prev_label_text)
+            self.lastLabel = text
         else:
             text = self.default_label_text_line.text()
 
@@ -1066,7 +1120,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.actions.fitWidth.setChecked(False)
         self.actions.fitWindow.setChecked(False)
         self.zoom_mode = self.MANUAL_ZOOM
-        self.zoom_widget.setValue(value)
+        self.zoom_widget.setValue(int(value))
 
     def add_zoom(self, increment=10):
         self.set_zoom(self.zoom_widget.value() + increment)
@@ -1117,8 +1171,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         d_v_bar_max = v_bar.maximum() - v_bar_max
 
         # get the new scrollbar values
-        new_h_bar_value = h_bar.value() + move_x * d_h_bar_max
-        new_v_bar_value = v_bar.value() + move_y * d_v_bar_max
+        new_h_bar_value = int(h_bar.value() + move_x * d_h_bar_max)
+        new_v_bar_value = int(v_bar.value() + move_y * d_v_bar_max)
 
         h_bar.setValue(new_h_bar_value)
         v_bar.setValue(new_v_bar_value)
@@ -1210,12 +1264,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
             counter = self.counter_str()
             self.setWindowTitle(LABELGTING + ' ' + file_path + ' ' + counter)
-
-            # TODO: auto detect
-            # gdino = GroundingDINOAPIWrapper("1253043b11a9c1e4c4da6d886a2ea847")
-            # prompts = dict(image=file_path, prompt='.'.join(self.tagLineEdit.tags))
-            # results = gdino.inference(prompts)
-            # print(results)
         
             # Default : select last item if there is at least one item
             if self.label_list.count():
@@ -1324,7 +1372,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             settings[SETTING_LAST_OPEN_DIR] = ''
 
         settings[SETTING_AUTO_SAVE] = self.auto_saving.isChecked()
-        settings[SETTING_SINGLE_CLASS] = self.single_class_mode.isChecked()
+        # settings[SETTING_SINGLE_CLASS] = self.single_class_mode.isChecked()
         settings[SETTING_PAINT_LABEL] = self.display_label_option.isChecked()
         settings[SETTING_DRAW_SQUARE] = self.draw_rectangles_option.isChecked()
         settings[SETTING_LABEL_FILE_FORMAT] = self.label_file_format
@@ -1380,23 +1428,19 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                 if file.lower().endswith((XML_EXT, TXT_EXT, JSON_EXT)) :
                     save_name_list.append(file[:-4])
 
-        msg = QtWidgets.QMessageBox()
-        msg.setIcon(QtWidgets.QMessageBox.Information)
-        msg.setText("Please Waiting ...")
-        msg.setWindowTitle("Loading")
-        msg.setStyleSheet("QLabel { font:16px Arial;}")
-        msg.addButton(QtWidgets.QMessageBox.Ok)
-        msg.button(QtWidgets.QMessageBox.Ok).hide()
-        msg.show()
-        QtWidgets.QApplication.processEvents()
-
+        self.loading = LoadingExtension(self)
+        self.loading.startLoading()
         for index in range(self.file_list_widget.count()):
+            if index%10 == 0:
+                QtWidgets.QApplication.processEvents()
             item_widget = self.file_list_widget.item(index)
+            self.loading.setProgress(int((index/(self.file_list_widget.count()-1))*100))
             saved_file_name = os.path.basename(item_widget.text())
             if os.path.splitext(saved_file_name)[0]  not in save_name_list :
                 item_widget.setBackground(QtGui.QColor('brown'))
             else :
                 item_widget.setBackground(QtGui.QColor( 'darkslategrey'))   
+        self.loading.loadingFinished()
 
     def open_annotation_dialog(self, _value=False):
         if self.file_path is None:
@@ -1471,18 +1515,20 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
     def thumbnail_image(self, _value=False):
         save_label_list = []
         read_image_list = []
-        self.progress.setRange(0, self.file_list_widget.count()-1) 
+        self.loading = LoadingExtension(self)
+        self.loading.startLoading()
 
         for index in range(self.file_list_widget.count()):
-            QtWidgets.QApplication.processEvents()
-            self.progress.setValue(index)
+            if index%10 == 0:
+                QtWidgets.QApplication.processEvents()
+            self.loading.setProgress(int((index/(self.file_list_widget.count()-1))*100))
             image_path = self.file_list_widget.item(index).text()
             basename = os.path.splitext(os.path.basename(image_path))[0]
             label_path = os.path.join(self.default_save_dir, basename + LabelFile.suffix)
             if os.path.isfile(label_path):
                 save_label_list.append(label_path)
                 read_image_list.append(image_path)
-        self.progress.cancel()
+        self.loading.loadingFinished()
 
         natural_sort(save_label_list, key=lambda x: x.lower())
         thumbnailview = ThumbnailView(read_image_list, save_label_list, parent=self) 
@@ -1766,9 +1812,13 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             shape.paint_label = self.display_label_option.isChecked()
 
     def toggle_draw_rectangles(self):
-        self.canvas.set_drawing_free_shape(self.draw_rectangles_option.isChecked())
+        self.use_box_size_checkbox.setChecked(self.draw_rectangles_option.isChecked())
+        self.change_box_size_ratio()
 
     def change_box_size_ratio(self):
+        if self.draw_rectangles_option.isChecked() != self.use_box_size_checkbox.isChecked():
+            self.draw_rectangles_option.setChecked(self.use_box_size_checkbox.isChecked())
+
         if (self.use_box_size_checkbox.isChecked() ) :
             self.Wspbox.setEnabled(True)
             self.Hspbox.setEnabled(True)

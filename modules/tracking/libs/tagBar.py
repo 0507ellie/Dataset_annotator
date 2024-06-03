@@ -1,7 +1,6 @@
-import os, sys, subprocess
+import os
 import codecs
-from PyQt5 import Qt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from functools import partial
 
 from modules.resources.resources  import *

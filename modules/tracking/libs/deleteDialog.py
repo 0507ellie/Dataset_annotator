@@ -1,6 +1,5 @@
 import cv2 
 import numpy as np
-from PyQt5 import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pathlib import Path
 
