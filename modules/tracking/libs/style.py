@@ -167,3 +167,69 @@ BTN_QSS = '''
                 background-color: rgb(45, 90, 83);
                 color : rgb(86, 170, 156);
             }'''
+
+LIST_QSS = '''
+    QListView {
+        color:black;
+        font: 40 12pt Bold "Microsoft YaHei";
+        border: 1px solid white; /* 设置边框的大小，样式，颜色 */
+        border-radius: 5px;
+        background-color: lightgray;
+    }
+    QScrollBar:vertical {
+        width: 9px;
+        margin: 0px 0 0px 0;
+        background-color: lightgray;
+    }
+    QScrollBar::handle:vertical {
+        min-height: 20px;
+        margin: 0 1px 0 2px;
+        border-radius: 3px;
+        border: none;
+        background: qlineargradient(spread:reflect, 
+            x1:0, y1:0, x2:1, y2:0, 
+            stop:0 rgba(85, 170, 255, 255), 
+            stop:0.5 rgba(125, 200, 255, 255),
+            stop:1 rgba(85, 170, 255, 255));
+    }
+    QScrollBar:horizontal {
+        height: 5px;
+        margin: 0px 0 0px 0;
+        background-color: lightgray;
+    }
+    QScrollBar::handle:horizontal {
+        min-width: 20px;
+        margin: 0 1px 0 2px;
+        border-radius: 3px;
+        border: none;
+        background: qlineargradient(spread:reflect, 
+            x1:0, y1:0, x2:1, y2:0, 
+            stop:0 rgba(85, 170, 255, 255), 
+            stop:0.5 rgba(125, 200, 255, 255),
+            stop:1 rgba(85, 170, 255, 255));
+    }
+
+    QScrollBar::add-line:vertical {
+        height: 0px;
+        subcontrol-position: bottom;
+        subcontrol-origin: margin;
+    }
+    
+    QScrollBar::sub-line:vertical {
+        height: 0px;
+        subcontrol-position: top;
+        subcontrol-origin: margin;
+    }
+    
+    QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+        border: 1px solid grey;
+        width: 3px;
+        height: 3px;
+        background: white;
+    }
+    
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+        background: none;
+    }
+
+'''

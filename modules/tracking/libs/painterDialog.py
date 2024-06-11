@@ -13,7 +13,7 @@ from typing import *
 
 from modules import qdarkstyle
 from modules.logger import Logger
-from modules.resources.resources  import *
+from resources.resources  import *
 from modules.labeling.libs.canvas import Canvas
 from modules.labeling.libs.colorDialog import ColorDialog
 from modules.labeling.libs.constants import *
@@ -460,6 +460,8 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         bar.setValue(int(bar.value() + bar.singleStep() * units))
 
     def set_zoom(self, value):
+        self.actions.fitWidth.setChecked(False)
+        self.actions.fitWindow.setChecked(False)
         self.zoom_mode = self.MANUAL_ZOOM
         self.zoom_widget.setValue(value)
 

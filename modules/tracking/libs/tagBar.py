@@ -3,7 +3,7 @@ import codecs
 from qtpy import QtCore, QtGui, QtWidgets
 from functools import partial
 
-from modules.resources.resources  import *
+from resources.resources  import *
 
 class DraggableTag(QtWidgets.QFrame):
     def __init__(self, text, parent=None):

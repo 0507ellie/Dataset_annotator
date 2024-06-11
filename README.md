@@ -1,4 +1,4 @@
-# Annotation Tool
+# Annotation Tool (v1.0.0)
 <p>
     <a href="#"><img alt="Python" src="https://img.shields.io/badge/Python-14354C.svg?logo=python&logoColor=white"></a>
     <a href="#"><img alt="PyQT5" src="https://img.shields.io/badge/PyQT5-49D.svg?logo=Qt&logoColor=white"></a>
@@ -28,13 +28,10 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
     This command utilizes the PyQt5 Resource Compiler (pyrcc5) tool. Its purpose is to compile a resource file (.qrc file) into Python code, allowing you to utilize these resources in your application, such as images, fonts, style sheets, etc.
     ```bash
-    $ pyrcc5 -o modules/resources/resources.py modules/resources.qrc
+    $ sudo pyrcc5 -o resources/resources.py resources/resources.qrc
     ```
 
 <h1 id="Usage">➤ Usage</h1>
-
-Note: 
-<font color="yellow">Please check the labels in the 'default_classes.txt' file first</font>. You don't need to specify the following CLI arguments.
 
 ***Tracking Labeling Tool*** :
 
@@ -45,17 +42,17 @@ Note:
     $ python trackingTool.py
     ```
     
-    * [<font color="yellow">Check Label Table</font>]: Check the label tags of classes.
+    * <font color="Blue">[ Check Label Table ] </font>: Check the label tags of classes.
     
-    * [<font color="yellow">Video Files List Path</font>]: Drag and drop video files into the field or use the Add Btn to add your own paths.
+    * <font color="Blue">[ Video Files List Path ] </font>: Drag and drop video files into the field or use the Add Btn to add your own paths.
     
-    * [<font color="yellow">Save Path</font>]: Root path for saving, where a folder will be automatically created for each video.
+    * <font color="Blue">[ Save Path ] </font>: Root path for saving, where a folder will be automatically created for each video.
     <p>
         <img src="./demo/trackingSelectUI.png" height=350px width=400px>
     </p>
 
     ```bash
-    # methods 2: CLI
+    # methods 2: custom yourself
     $ python trackingTool.py -i <path-to-video-dir> -c <path-to-txt-classes> -o <path-to-ouput-folder>
     ```
 
@@ -67,6 +64,8 @@ Note:
     - `--save_folder` : Folder to save the results.
 
 - Keyboard operation:
+
+    Tracker View
 
     | ID         | Describe            |
     |------------|---------------------|
@@ -90,9 +89,9 @@ Note:
 $ python labelingTool.py
 ```
 
-* [<font color="yellow">Open Directory</font>] : corresponds to the 'images' folder
+* <font color="Blue">[ Open Directory ] </font>: corresponds to the 'images' folder
 
-* [<font color="yellow">Change Saving Directory</font>] : corresponds to the 'labels' folder.
+* <font color="Blue">[ Change Saving Directory ] </font>: corresponds to the 'labels' folder.
 <p>
     <img src="./demo/labelingUI.png" height=350px width=700px>
 </p>

@@ -319,7 +319,6 @@ class ThumbnailView(QDialog):
 					self.thread = Worker()
 					self.thread.progressBarValue.connect(self.updatebar)
 					for index, (frame_index, label_index) in enumerate(zip(self.image_path, self.label_path)) :
-						# TODO : not success
 						if self.parent.label_file_format.value == LabelFileFormat.PASCAL_VOC.value:
 							for thumb in self.parseXmlFormat(frame_index, label_index):
 								self.addImage(thumb)

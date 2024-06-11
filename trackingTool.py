@@ -17,7 +17,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from concurrent.futures import ThreadPoolExecutor
 
 from modules.logger import Logger
-from modules.resources.resources  import *
+from resources.resources  import *
 from modules.labeling.libs.create_ml_io import JSON_EXT
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
 from modules.labeling.libs.pascal_voc_io import XML_EXT
@@ -27,6 +27,7 @@ from modules.tracking.libs.fileDialog import FileDialog
 from modules.tracking.libs.painterDialog import PainterDialog
 from modules.tracking.motion import MotionDetector
 
+APPNAME = 'TrackingTool'
 debug = Logger(None, logging.INFO, logging.INFO )
 
 argparser = argparse.ArgumentParser(description='Multitracker for labeling in the video')
@@ -193,11 +194,6 @@ if __name__ == '__main__':
     args = argparser.parse_args()
     app = QtWidgets.QApplication(sys.argv)
     
-    DISPLAT_RATE = 0.66
-    desktop = QtWidgets.QApplication.desktop()
-    display_size = (int(desktop.width() * DISPLAT_RATE), 
-                    int(desktop.height() * DISPLAT_RATE))
-    
     if args.video_dir:
         interval_frame = 10
         ROOT_DIRS = args.video_dir
@@ -210,7 +206,7 @@ if __name__ == '__main__':
             if item.is_file():
                 video_paths.append(item)   
     else:
-        dlg = FileDialog("File Dialog", args.class_file)
+        dlg = FileDialog(APPNAME, args.class_file)
         dlg.show()  # Show the dialog
         app.exec_()
         video_paths = dlg.getVideoList()
@@ -246,7 +242,12 @@ if __name__ == '__main__':
         end_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1)
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         ret, image = cap.retrieve()
-
+        
+        DISPLAT_RATE = 0.66
+        desktop = QtWidgets.QApplication.desktop()
+        display_size = (int(desktop.width() * DISPLAT_RATE), 
+                        int(desktop.width() * DISPLAT_RATE*(image.shape[0]/image.shape[1])) if ret else int(desktop.width() * DISPLAT_RATE) )
+    
         tracker = ObjectTack(cpu_workers=mp.cpu_count() - 1)
         tracker.loadClasses(args.class_file)
         tracker.initBox(image)
