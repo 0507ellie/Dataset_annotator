@@ -31,6 +31,8 @@ from modules.labeling.libs.utils import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.zoomWidget import ZoomWidget
 
+from modules.tracking.libs.tagBar import TagBar
+
 TITLE = 'LabelPainter'
 debug = Logger(None, logging.INFO, logging.INFO )
 
@@ -63,7 +65,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         else :
             self.debug = debug
         self.setWindowTitle(TITLE)
-        self.setWindowIcon(QtGui.QIcon(':/LabelGTImg'))
+        self.setWindowIcon(QtGui.QIcon(":/app/trackingTool"))
         # Load setting in the main thread
         self.settings = Settings()
         self.settings.load()
@@ -75,7 +77,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
 
         # For loading all image under a directory
         self.dir_name = None
-        self.label_hist = []
         self.cur_img_idx = 0
         self.img_count = 1
 
@@ -85,10 +86,10 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self._beginner = True
 
         # Load predefined classes to the list
-        self.load_predefined_classes(default_prefdef_class_file)
+        label_hist = self.load_predefined_classes(default_prefdef_class_file)
 
         # Main widgets and related state.
-        self.label_dialog = LabelDialog(parent=self, list_item=self.label_hist)
+        self.label_dialog = LabelDialog(parent=self, list_item=label_hist)
 
         self.items_to_shapes = {}
         self.shapes_to_items = {}
@@ -203,6 +204,18 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.tools.clear()
         add_actions(self.tools, self.actions.beginner)
         
+        classHLayout = QtWidgets.QHBoxLayout()
+        self.tagLabel = QtWidgets.QLabel("Label Tags : ")
+        self.tagLabel.setStyleSheet("color : rgb(255, 255, 255);")
+        self.tagLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
+        self.tagLabel.setMinimumHeight(5)
+        classHLayout.addWidget(self.tagLabel)
+        self.tagLineEdit = TagBar(self)
+        self.tagLineEdit.load_tags(label_hist)
+        self.tagLineEdit.setStyleSheet(" margin: 0px; padding: 0px; background-color: rgb(27,29,35); border: 0.5px solid white; border-radius: 15px; color : rgb(200, 200, 200);" )
+        classHLayout.addWidget(self.tagLineEdit)
+        classHLayout.addStretch(1)
+  
         self.canvas.menus[0].clear()
         add_actions(self.canvas.menus[0], self.actions.beginnerContext)
 
@@ -253,6 +266,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         footerHlayout.addWidget(self.status_label)
         centralVlayout = QtWidgets.QVBoxLayout()
         centralVlayout.addWidget(self.tools)
+        centralVlayout.addLayout(classHLayout)
         centralVlayout.addWidget(scroll)
         layout.addLayout(centralVlayout)
         layout.addLayout(footerHlayout)
@@ -426,14 +440,19 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
 
         position MUST be in global coordinates.
         """
-        self.label_dialog = LabelDialog(
-            parent=self, list_item=self.label_hist)
-        self.label_dialog.edit.hide()
-        self.label_dialog.button_box.hide()
-        
-        text = self.label_dialog.pop_up(text=self.prev_label_text)
-        self.lastLabel = text
+        if len(self.tagLineEdit.tags) > 0:
+            self.label_dialog = LabelDialog(
+                parent=self, list_item=self.tagLineEdit.tags)
+            self.label_dialog.edit.hide()
+            self.label_dialog.button_box.hide()
             
+            text = self.label_dialog.pop_up(text=self.prev_label_text)
+            self.lastLabel = text
+        else:
+            QtWidgets.QMessageBox.critical(self, "Error", f"Label tags is empty, can't create new shape")
+            self.canvas.shapes.pop()
+            return
+   
         # Add Chris
         if text is not None:
             self.prev_label_text = text
@@ -446,9 +465,6 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
                 self.actions.create.setEnabled(True)
             else:
                 self.actions.editMode.setEnabled(True)
-
-            if text not in self.label_hist:
-                self.label_hist.append(text)
         else:
             # self.canvas.undoLastLine()
             self.canvas.reset_all_lines()
@@ -560,7 +576,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
 
     def scale_fit_window(self):
         """Figure out the size of the pixmap in order to fit the main widget."""
-        e = 2.0  # So that no scrollbars are generated.
+        e = 50.0  # So that no scrollbars are generated.
         w1 = self.width() - e
         h1 = self.height() - e
         a1 = w1 / h1
@@ -752,17 +768,19 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.canvas.end_move(copy=False)
     
     def load_predefined_classes(self, predef_classes_file):
+        label_hist = []
         if os.path.exists(predef_classes_file) is True:
             with codecs.open(predef_classes_file, 'r', 'utf8') as f:
                 for line in f:
                     line = line.strip()
-                    if self.label_hist is None:
-                        self.label_hist = [line]
+                    if label_hist is []:
+                        label_hist = [line]
                     else:
-                        self.label_hist.append(line)
+                        label_hist.append(line)
             self.classes_file = predef_classes_file
         else :
             self.classes_file = None
+        return label_hist
 
     def load_bbox_by_list(self, bbox_list):
         shapes = []

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from libs.ustr import ustr
 from libs.yolo_io import TXT_EXT, YoloReader
 from libs.pascal_voc_io import XML_EXT, PascalVocReader
+from libs.create_ml_io import JSON_EXT, CreateMLReader
 from libs.labelFile import LabelFileFormat, LabelFile
 
 BTN_QSS =  '''
@@ -299,7 +300,28 @@ class ThumbnailView(QDialog):
 			else :
 				self.debug.error("Image read error : " + src_frame_path)
 		return images_id_list
-	
+
+	def parseJsonFormat(self, src_frame_path, src_label_path) -> ThumbnailInfo:
+		images_id_list = []
+		successed , image = self.checkImg(src_frame_path)
+		if not successed: return  images_id_list
+
+		create_ml_parse_reader = CreateMLReader(src_label_path, src_frame_path)
+		shapes = create_ml_parse_reader.get_shapes()
+		for idx, (label, points, line_color, fill_color, difficult) in enumerate(shapes):
+			if (label != self.displaytext.text()): continue
+			
+			info = ThumbnailInfo(src_frame_path, src_label_path, image, label, difficult,
+								 xmin = points[0][0],
+								 ymin = points[0][1],
+								 xmax = points[2][0],
+								 ymax = points[2][1])
+			if not image.isNull():
+				images_id_list.append(info)
+			else :
+				self.debug.error("Image read error : " + src_frame_path)
+		return images_id_list
+
 	def updatebar(self, i):
 		self.progressBar.setValue(i)
 
@@ -326,8 +348,8 @@ class ThumbnailView(QDialog):
 							for thumb in self.parseTxtFormat(frame_index, label_index):
 								self.addImage(thumb)
 						elif self.parent.label_file_format.value == LabelFileFormat.CREATE_ML.value:
-							print("TODO: Not Done")
-							pass
+							for thumb in self.parseJsonFormat(frame_index, label_index):
+								self.addImage(thumb)
 						else:
 							pass
 
@@ -397,8 +419,14 @@ class ThumbnailView(QDialog):
 																		image_QWidget.image_id.image, 
 																		self.parent.label_hist)
 								elif self.parent.label_file_format.value == LabelFileFormat.CREATE_ML.value:
-									# TODO: Not Done
-									pass
+									t_ml_parse_reader = CreateMLReader(image_QWidget.image_id.annotation_path, image_QWidget.image_id.image_path)
+									shapes += [ dict(label=label, points=points, difficult=difficult) 
+												for label, points, _, _, difficult in t_ml_parse_reader.get_shapes() if label != self.displaytext.text()]
+									self.label_file.save_create_ml_format(image_QWidget.image_id.annotation_path, 
+																			shapes, 
+																			image_QWidget.image_id.image_path, 
+																			image_QWidget.image_id.image, 
+																			self.parent.label_hist)
 								else:
 									pass
 								self.debug.info(f"File '{image_QWidget.image_id}' deleted successfully.")

@@ -4,6 +4,7 @@ import logging
 from qtpy import QtCore, QtGui, QtWidgets
 
 import labelingTool
+import trackingTool
 import createDataBase
 import convertFormat
 from modules import qdarkstyle
@@ -32,13 +33,11 @@ class GuideWindow(QtWidgets.QMainWindow):
         self.labelingGridLayout.addWidget(labelingApp, 0, 0, 1, 1)
         self.ui.stackedWidget.addWidget(self.labelingPage)
         
-        # TrackingTool (TODO: not done)
+        # TrackingTool
         self.trackingPage = QtWidgets.QWidget()
         self.trackingGridLayout = QtWidgets.QGridLayout(self.trackingPage)
-        self.label_5 = QtWidgets.QLabel(self.trackingPage)
-        self.label_5.setAlignment(QtCore.Qt.AlignCenter)
-        self.label_5.setText("Tracking Page")
-        self.trackingGridLayout.addWidget(self.label_5, 0, 0, 1, 1)
+        trackingApp = trackingTool.MainWidget('default_classes.txt', debug)
+        self.trackingGridLayout.addWidget(trackingApp, 0, 0, 1, 1)
         self.ui.stackedWidget.addWidget(self.trackingPage)
         
         # ConvertFormat 

@@ -1,4 +1,4 @@
-# Annotation Tool (v1.0.0)
+# Annotation Tool (v1.0.1)
 <p>
     <a href="#"><img alt="Python" src="https://img.shields.io/badge/Python-14354C.svg?logo=python&logoColor=white"></a>
     <a href="#"><img alt="PyQT5" src="https://img.shields.io/badge/PyQT5-49D.svg?logo=Qt&logoColor=white"></a>
@@ -8,6 +8,11 @@
     <a href="#"><img alt="Windows" src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white"></a>
 </p>
 
+<p class="center">
+    <img src="./demo/labelingPage.png" height=170px width=230px>
+    <img src="./demo/trackingPage.png" height=170px width=230px>
+    <img src="./demo/formatPage.png" height=170px width=230px>
+</p>
 
 <h1 id="Dependecies">➤ Dependecies</h1>
 
@@ -37,23 +42,16 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
 - Run :
 
-    ```bash
-    # methods 1: setting in the UI
-    $ python trackingTool.py
-    ```
-    
-    * <font color="Blue">[ Check Label Table ] </font>: Check the label tags of classes.
-    
-    * <font color="Blue">[ Video Files List Path ] </font>: Drag and drop video files into the field or use the Add Btn to add your own paths.
-    
-    * <font color="Blue">[ Save Path ] </font>: Root path for saving, where a folder will be automatically created for each video.
     <p>
-        <img src="./demo/trackingSelectUI.png" height=350px width=400px>
+        <img src="./demo/trackingUI.png" height=350px width=700px>
     </p>
 
     ```bash
+    # methods 1: setting in the UI
+    $ python trackingTool.py
+
     # methods 2: custom yourself
-    $ python trackingTool.py -i <path-to-video-dir> -c <path-to-txt-classes> -o <path-to-ouput-folder>
+    $ python trackingTool.py -i <path-to-video-dir> -c <path-to-txt-classes> -o <path-to-ouput-dir>
     ```
 
     Description of CLI all arguments:
@@ -61,17 +59,15 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
     - `--class_file` : Path to the file containing class names.
 
-    - `--save_folder` : Folder to save the results.
+    - `--save_dir` : Folder to save the results(Default: Under the path of the current video)
 
 - Keyboard operation:
 
     Tracker View
 
-    | ID         | Describe            |
-    |------------|---------------------|
-    | Tab/Enter  |Enter Label Painter. |
-    | Esc        |Quit.                | 
-
+    <p>
+        <img src="./demo/trackingKeyboard.png" height=200px width=550px>
+    </p>
 
     Label Painter
 
@@ -82,30 +78,33 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
     | Ctrl+C   |Copy the previous box.|
     | Esc      |Exit Painter Mode.    |
 
+
 ***Manual Labeling Tool*** :
 
-```bash
-# methods 1: setting in the UI
-$ python labelingTool.py
-```
+- Run :
 
-* <font color="Blue">[ Open Directory ] </font>: corresponds to the 'images' folder
+    <p>
+        <img src="./demo/labelingUI.png" height=350px width=700px>
+    </p>
 
-* <font color="Blue">[ Change Saving Directory ] </font>: corresponds to the 'labels' folder.
-<p>
-    <img src="./demo/labelingUI.png" height=350px width=700px>
-</p>
+    ```bash
+    # methods 1: setting in the UI
+    $ python labelingTool.py
 
-```bash
-# method 2: custom yourself
-$ python labelingTool.py -i <path-to-image-dir> -c <path-to-txt-classes> -o <path-to-label-folder>
-```
+    # method 2: custom yourself
+    $ python labelingTool.py -i <path-to-image-dir> -c <path-to-txt-classes> -o <path-to-label-dir>
+    ```
 
-Description of CLI all arguments:
+    Description of CLI all arguments:
 
-- `--image_dir` : Path to the directory containing images.
+    - `--image_dir` : Path to the directory containing images.
 
-- `--class_file` : Path to the file containing class names.
+    - `--class_file` : Path to the file containing class names.
 
-- `--save_dir` : Path to the directory to save labels.
+    - `--save_dir` : Path to the directory to save labels.
 
+- Keyboard operation:
+
+    <p>
+        <img src="./demo/labelingKeyboard.png" height=350px width=700px>
+    </p>

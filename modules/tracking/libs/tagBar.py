@@ -113,7 +113,7 @@ class TagBar(QtWidgets.QWidget):
             else:
                 self.tags.append(tags.strip())
             self.refresh()
-
+        
     def delete_tag(self, tag_name):
         self.tags.remove(tag_name)
         self.refresh()
@@ -133,7 +133,7 @@ class TagBar(QtWidgets.QWidget):
         for tag in self.tags:
             self.add_tag_to_bar(tag)
         self.tagsHlayout.addWidget(self.line_edit)
-        self.line_edit.setFocus()
+        # self.line_edit.setFocus()
         
         if isinstance(self.parent.classes_file, str):
             if os.path.exists(self.parent.classes_file) is True:

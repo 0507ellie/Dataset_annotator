@@ -632,7 +632,7 @@ class MainWidget(QtWidgets.QMainWindow):
 				"nc" : len(self.label_hist),
 				"names" : { idx:label for idx, label in enumerate(self.label_hist)},
 			}
-			with open( save_root_path + '/data.yml', 'w') as outfile:
+			with open( save_root_path + '/data.yaml', 'w') as outfile:
 				yaml.dump(data, outfile, default_flow_style=False, sort_keys=False)
 			print(self.tableWidget.getTableData())
 		else:

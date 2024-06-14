@@ -309,10 +309,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 					'Ctrl+O', 'open', get_str('openFileDetail'))
 
 		open_dir = action(get_str('openDir'), self.open_dir_dialog,
-						'Ctrl+u', 'open', get_str('openDir'))
+						'Ctrl+u', 'open-dir', get_str('openDir'))
 
 		change_save_dir = action(get_str('changeSaveDir'), self.change_save_dir_dialog,
-								'Ctrl+r', 'open', get_str('changeSavedAnnotationDir'))
+								'Ctrl+r', 'save-dir', get_str('changeSavedAnnotationDir'))
 
 		open_annotation = action(get_str('openAnnotation'), self.open_annotation_dialog,
 								 'Ctrl+Shift+O', 'open', get_str('openAnnotationDetail'))
@@ -487,7 +487,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 						(open_annotation, copy_prev_bounding, self.menus.recentFiles, save, save_format, save_as, close, reset_all, delete_image, quit))
 		else :
 			add_actions(self.menus.file,
-						(open, open_dir, change_save_dir, open_annotation, copy_prev_bounding, self.menus.recentFiles, save, save_format, save_as, close, reset_all, delete_image, quit))
+						(open, open_dir, open_annotation, change_save_dir, copy_prev_bounding, self.menus.recentFiles, save, save_format, save_as, close, reset_all, delete_image, quit))
 		add_actions(self.menus.help, (help_default, show_info, show_shortcut))
 		add_actions(self.menus.view, (
 			self.auto_saving,
@@ -611,19 +611,19 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 	# Support Functions #
 	def set_format(self, save_format):
 		if save_format == FORMAT_PASCALVOC:
-			self.actions.save_format.setText(FORMAT_PASCALVOC)
+			self.actions.save_format.setIconText(FORMAT_PASCALVOC)
 			self.actions.save_format.setIcon(new_icon("format_voc"))
 			self.label_file_format = LabelFileFormat.PASCAL_VOC
 			LabelFile.suffix = XML_EXT
 
 		elif save_format == FORMAT_YOLO:
-			self.actions.save_format.setText(FORMAT_YOLO)
+			self.actions.save_format.setIconText(FORMAT_YOLO)
 			self.actions.save_format.setIcon(new_icon("format_yolo"))
 			self.label_file_format = LabelFileFormat.YOLO
 			LabelFile.suffix = TXT_EXT
 
 		elif save_format == FORMAT_CREATEML:
-			self.actions.save_format.setText(FORMAT_CREATEML)
+			self.actions.save_format.setIconText(FORMAT_CREATEML)
 			self.actions.save_format.setIcon(new_icon("format_createml"))
 			self.label_file_format = LabelFileFormat.CREATE_ML
 			LabelFile.suffix = JSON_EXT
@@ -1612,7 +1612,11 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			self.cur_img_idx = 0
 			self.img_count = 1
 			self.load_file(filename)
-
+   
+			self.m_img_list.append(filename)
+			item = QtWidgets.QListWidgetItem(filename)
+			self.file_list_widget.addItem(item)
+   
 	def save_file(self, _value=False):
 		if self.default_save_dir is not None and len(ustr(self.default_save_dir)):
 			if self.file_path:
@@ -1844,13 +1848,13 @@ class MainWidget(QtWidgets.QWidget):
 		self.debug = debug
 		self.class_path = class_path
 
-        # --------------------------------------------
-        #                Top Part
-        # --------------------------------------------
+		# --------------------------------------------
+		#                Top Part
+		# --------------------------------------------
 		topHLayout = QtWidgets.QHBoxLayout()
 		# Show UI
 		imageVLayout = QtWidgets.QVBoxLayout()
-		titleLabel = QtWidgets.QLabel(APPNAME + "App")
+		titleLabel = QtWidgets.QLabel(APPNAME + " App")
 		titleLabel.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
 		imageVLayout.addWidget(titleLabel)
 		imagelabel = QtWidgets.QLabel()
@@ -1862,6 +1866,7 @@ class MainWidget(QtWidgets.QWidget):
 		pixmap = pixmap.scaled(width, height)
 		imagelabel.setPixmap(pixmap)
 		imageVLayout.addWidget(imagelabel)
+		imageVLayout.addStretch(1)
 		topHLayout.addLayout(imageVLayout)
 
 		# format
@@ -1896,6 +1901,7 @@ class MainWidget(QtWidgets.QWidget):
 			newitem = QtWidgets.QTableWidgetItem()
 			icon = QtGui.QIcon(item)
 			pixmap = icon.pixmap(QtCore.QSize(50, 50))
+			pixmap = self.recolorPixmap(pixmap, QtGui.QColor(200, 200, 200))
 			newitem.setIcon(QtGui.QIcon(pixmap))
 			newitem.setTextAlignment(QtCore.Qt.AlignCenter)
 			formatTableWidget.setItem(n, 0, newitem)
@@ -1914,24 +1920,26 @@ class MainWidget(QtWidgets.QWidget):
 		formatVLayout.addWidget(saveLabel)
 		topHLayout.addLayout(formatVLayout)
 
-        # --------------------------------------------
-        #               bottom Part
-        # --------------------------------------------
+		# --------------------------------------------
+		#               bottom Part
+		# --------------------------------------------
 		bottomVLayout = QtWidgets.QVBoxLayout()
 
 		keyboardLabel = QtWidgets.QLabel("KeyBoard Control : ")
 		keyboardLabel.setStyleSheet("color: rgb(255, 255, 255);")
 		keyboardLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
 		bottomVLayout.addWidget(keyboardLabel)
-		data1 = { '『D』' : "Open the next Image", 
-				  '『A』' : "Open the previous Image",
-				  '『w』' : "Draw a new box",
-				  '『Delete』': "Remove the box",
-				  '『Ctrl+C』' : "Create a duplicate of the selected box",
-				  '『Ctrl+S』' : "Save the labels to a file",
-				  '『Ctrl+E』' : "Modify the label of the selected Box",
-				  '『Ctrl+Q』' : "Quit application", }
-		keyboardTableWidget = QtWidgets.QTableWidget(len(data1), 2)
+		data1 = { '『Ctrl+U』': [":/open-dir", "Open images/label Dir"],
+				  '『Ctrl+R』': [":/save-dir", "Change default saved label dir"],
+           		  '『D』' : [':/next', "Open the next Image"], 
+				  '『A』' : [':/prev', "Open the previous Image"],
+				  '『w』' : [':/new', "Draw a new box"],
+				  '『Delete』': [':/delete', "Remove the box"],
+				  '『Ctrl+C』' : [':/copy', "Create a duplicate of the selected box"],
+				  '『Ctrl+S』' : [':/save', "Save the labels to a file"],
+				  '『Ctrl+E』' : [':/edit',"Modify the label of the selected Box"],
+				  '『Ctrl+Q』' : [':/quit',"Quit application"], }
+		keyboardTableWidget = QtWidgets.QTableWidget(len(data1), 3)
 		keyboardTableWidget.setStyleSheet(TABLE_QSS)
 		keyboardTableWidget.setFrameShape(QtWidgets.QFrame.NoFrame)
 		keyboardTableWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
@@ -1947,14 +1955,24 @@ class MainWidget(QtWidgets.QWidget):
 		keyboardTableWidget.horizontalHeader().setStretchLastSection(True)
 		keyboardTableWidget.verticalHeader().setVisible(False)
 		keyboardTableWidget.verticalHeader().setCascadingSectionResizes(False)
-		keyboardTableWidget.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-		keyboardTableWidget.setHorizontalHeaderLabels(["Actions", "Describe"])
+		keyboardTableWidget.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+		keyboardTableWidget.setHorizontalHeaderLabels(["Actions", "Icon", "Describe"])
 		for n, item in enumerate(data1.keys()):
 			newitem = QtWidgets.QTableWidgetItem(item)
+			newitem.setTextAlignment(QtCore.Qt.AlignCenter)
 			keyboardTableWidget.setItem(n, 0, newitem)
-			
-			newitem = QtWidgets.QTableWidgetItem(data1[item])
+
+			newitem = QtWidgets.QTableWidgetItem()
+			newitem.setTextAlignment(QtCore.Qt.AlignCenter)
+			icon = QtGui.QIcon(data1[item][0])
+			pixmap_size = QtCore.QSize(50, 50)
+			pixmap = icon.pixmap(pixmap_size)
+			scaled_pixmap = pixmap.scaled(pixmap_size)
+			newitem.setIcon(QtGui.QIcon(scaled_pixmap))
 			keyboardTableWidget.setItem(n, 1, newitem)
+            	
+			newitem = QtWidgets.QTableWidgetItem(data1[item][1])
+			keyboardTableWidget.setItem(n, 2, newitem)
 		keyboardTableWidget.resizeColumnsToContents()
 		bottomVLayout.addWidget(keyboardTableWidget)
 
@@ -1990,6 +2008,20 @@ class MainWidget(QtWidgets.QWidget):
 			self.win.set_qdarkstyle()
 			self.win.show()
 
+	def recolorPixmap(self, pixmap, color):
+		image = pixmap.toImage()
+		
+		# Loop through all the pixels in the image and change the color
+		for x in range(image.width()):
+			for y in range(image.height()):
+				pixel_color = image.pixelColor(x, y)
+				if pixel_color.alpha() > 0:  # Only recolor non-transparent pixels
+					new_color = QtGui.QColor(color)
+					new_color.setAlpha(pixel_color.alpha())  # Preserve original alpha
+					image.setPixelColor(x, y, new_color)
+		
+		return QtGui.QPixmap.fromImage(image)
+    
 def main(argv=[]):
 	"""construct main app and run it"""
 	"""
