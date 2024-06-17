@@ -1,4 +1,4 @@
-# Annotation Tool (v1.0.1)
+# Annotation Tool (v1.0.2)
 <p>
     <a href="#"><img alt="Python" src="https://img.shields.io/badge/Python-14354C.svg?logo=python&logoColor=white"></a>
     <a href="#"><img alt="PyQT5" src="https://img.shields.io/badge/PyQT5-49D.svg?logo=Qt&logoColor=white"></a>
@@ -13,6 +13,16 @@
     <img src="./demo/trackingPage.png" height=170px width=230px>
     <img src="./demo/formatPage.png" height=170px width=230px>
 </p>
+
+<h1 id="Release">➤ Release App</h1>
+
+```bash
+# For Linux
+$ ./app
+
+# For Windows
+> app.exe or double click app
+```
 
 <h1 id="Dependecies">➤ Dependecies</h1>
 

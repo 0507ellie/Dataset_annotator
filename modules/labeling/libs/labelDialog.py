@@ -32,7 +32,8 @@ class LabelDialog(QDialog):
         self.edit.editingFinished.connect(self.post_process)
 
         model = QStringListModel()
-        model.setStringList(list_item)
+        if list_item:
+            model.setStringList(list_item)
         completer = QCompleter()
         completer.setModel(model)
         self.edit.setCompleter(completer)

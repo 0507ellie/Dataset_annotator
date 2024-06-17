@@ -1,15 +1,13 @@
 import os
 import sys
 import logging
+from pathlib import Path
 from qtpy import QtCore, QtGui, QtWidgets
 
 import labelingTool
 import trackingTool
 import convertFormat
 import createDataBase
-from labelingTool import *
-from trackingTool import *
-from convertFormat import *
 from modules import qdarkstyle
 from modules.guideSideBar import MainWindow
 from modules.tracking.libs.style import TABLE_QSS, BTN_QSS
@@ -19,8 +17,10 @@ from modules.logger import Logger
 # Bundles Python Application (For linux)
 $ pyinstaller --paths=~/Desktop/Code/Platform/Annotator/modules/:modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
 $ ./app
-'''
 
+# Bundles Python Application (For windows)
+> pyinstaller --paths=./Annotator/modules/;modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo -F -w app.py --icon=./resources/icons/Logo.ico
+'''
 
 debug = Logger(None, logging.INFO, logging.INFO )
 
@@ -36,6 +36,10 @@ class GuideWindow(QtWidgets.QMainWindow):
         self.ui.labelingFullBtn.setChecked(True)
 
     def initBtnPageUI(self):
+        if not Path('default_classes.txt').is_file():
+            with open('default_classes.txt', 'w') as f:
+                pass
+
         # LabelingTool
         self.labelingPage = QtWidgets.QWidget()
         self.labelingGridLayout = QtWidgets.QGridLayout(self.labelingPage)
