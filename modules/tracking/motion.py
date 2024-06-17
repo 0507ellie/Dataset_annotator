@@ -125,10 +125,15 @@ class MotionDetector(MotionInfo):
             frame (numpy.ndarray): Input frame.
         """
         if len(self.points):
+            overlay = frame.copy()
             for rect in self.points:
                 x, y, w, h = rect
-                # Draw a rectangle around big enough movements
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                # Draw a rectangle on the overlay
+                cv2.rectangle(overlay, (x, y), (x + w, y + h), (255, 255, 255), -1)  # Filled rectangle
+
+            # Apply the overlay
+            alpha = 0.2
+            cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
         
     def DrawMotionHeatmap(self, window_name: str = "Motion Display") -> None:
         """

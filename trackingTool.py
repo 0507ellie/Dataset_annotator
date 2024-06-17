@@ -23,7 +23,7 @@ from modules.labeling.libs.yolo_io import TXT_EXT
 from modules.labeling.libs.toolBar import ToolBar
 from modules.tracking.tracker import TrackerDetector
 from modules.tracking.motion import MotionDetector
-from modules.tracking.libs.videoFile import LoadingQWidget
+from modules.tracking.libs.switch import SwitchBtn
 from modules.tracking.libs.style import TABLE_QSS, BTN_QSS
 from modules import qdarkstyle
 
@@ -61,14 +61,27 @@ class FilterSettings(QtWidgets.QDialog):
         intervalHLayout.addWidget(self.intervalBox)
         intervalHLayout.addStretch(1)
         
+        motionFLayout = QtWidgets.QFormLayout()
+        motionFLayout.setAlignment(QtCore.Qt.AlignVCenter)
+        motionLabel = QtWidgets.QLabel("Motion Detector : ")
+        motionLabel.setFixedHeight(30)
+        motionLabel.setStyleSheet("color: rgb(220, 220, 220);")
+        motionLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
+        self.motionBtn = SwitchBtn()
+        motionFLayout.addRow(motionLabel, self.motionBtn)
+        
         self.setWindowTitle("Settings")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         _layout = QtWidgets.QVBoxLayout()
         _layout.addLayout(intervalHLayout)
+        _layout.addLayout(motionFLayout)
         self.setLayout(_layout)
         
     def getInterval(self):
         return int(self.intervalBox.value())
+    
+    def getMotionSetting(self):
+        return self.motionBtn.isChecked()
     
 class MainWindow(QtWidgets.QMainWindow, WindowMixin):
     def __init__(self, default_filedir=None, default_prefdef_class_file=None, 
@@ -89,6 +102,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.filterDialog = FilterSettings(10)
         self.filterDialog.hide()
         self.interval_frame = self.filterDialog.getInterval()
+        self.motion_status = self.filterDialog.getMotionSetting()
         
         screen = QtWidgets.QDesktopWidget().screenGeometry()
         self.resize(int(screen.width() * 0.7), 
@@ -125,6 +139,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                                 "Change save format", enabled=True)
 
         displayHLayout.addWidget(self.tools)
+        # self.addToolBar(QtCore.Qt.LeftToolBarArea, self.tools)
         add_actions(self.tools, (open_files, open_painter, change_save_dir, open_filter_setting, save_format))
         self.actions = Struct(open_painter=open_painter, save_format=save_format)
         
@@ -243,8 +258,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                                                         file not in self.video_files]
             if new_files:
                 self.load_video_files(new_files)
-                
+        
         if not self.timer.isActive() and self.current_video_index != -1:
+            if not self.cap.isOpened():
+                self.play_next_video()
             self.timer.start(1000 // self.fps)
 
     def open_painter(self):
@@ -295,6 +312,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             item_widget.setBackground(QtGui.QColor( 'darkslategrey'))
             self.play_video(self.video_files[self.current_video_index])
         else:
+            self.current_video_index -= 1
             self.videoLabel.clear()
             self.timer.stop()
 
@@ -322,12 +340,14 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             if self.tracker:
                 tracker_list = self.tracker.update(frame)
                 
-            if self.current_frame % self.interval_frame == 0 : #TODO: #or self.motion.update(image):
+            if (self.current_frame % self.interval_frame == 0) or \
+                (self.motion_status and self.motion.update(frame)):
                    self.save_file(frame, tracker_list)
 
-            # TODO: add motion UI
-            # self.motion.DrawMotionOnFrame(image)
-            # self.motion.DrawMotionHeatmap()
+            # TODO: add motion
+            if self.motion_status:
+                self.motion.DrawMotionOnFrame(frame)
+                # self.motion.DrawMotionHeatmap()
 
             # draw tracker bboxs on image
             for label, bbox in tracker_list:
@@ -354,36 +374,36 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         image_file_name = str(self.current_frame).rjust(5, '0') + '.jpg'
         label_file_name = str(self.current_frame).rjust(5, '0')
         cv2.imwrite(str(self.images_dir_path.joinpath(image_file_name)), image)
-
-        shapes = []
-        for label, bbox in label_list:
-            p1 = (int(bbox[0]), int(bbox[1]))
-            p2 = (int(bbox[0] + bbox[2]), int(bbox[1]))
-            p3 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-            p4 = (int(bbox[0]), int(bbox[1] + bbox[3]))
-            shapes.append(dict(label=label, points=[p1, p2, p3, p4], difficult=False))
-            
-        label_file = LabelFile()
-        if self.label_file_format == LabelFileFormat.YOLO:
-            label_file_name += TXT_EXT
-            label_file.save_yolo_format(str(self.labels_dir_path.joinpath(label_file_name)),
-                                        shapes, 
-                                        str(self.images_dir_path.joinpath(image_file_name)),
-                                        image,
-                                        self.tracker.label_hist)
-        elif self.label_file_format == LabelFileFormat.PASCAL_VOC:
-            label_file_name += XML_EXT
-            label_file.save_pascal_voc_format(str(self.labels_dir_path.joinpath(label_file_name)),
-                                                shapes, 
-                                                str(self.images_dir_path.joinpath(image_file_name)), 
-                                                image)
-        elif self.label_file_format == LabelFileFormat.CREATE_ML:
-            label_file_name += JSON_EXT
-            label_file.save_create_ml_format(str(self.labels_dir_path.joinpath(label_file_name)),
-                                                shapes, 
-                                                str(self.images_dir_path.joinpath(image_file_name)),
-                                                image,
-                                                self.tracker.label_hist)
+        if label_list:
+            shapes = []
+            for label, bbox in label_list:
+                p1 = (int(bbox[0]), int(bbox[1]))
+                p2 = (int(bbox[0] + bbox[2]), int(bbox[1]))
+                p3 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
+                p4 = (int(bbox[0]), int(bbox[1] + bbox[3]))
+                shapes.append(dict(label=label, points=[p1, p2, p3, p4], difficult=False))
+                
+            label_file = LabelFile()
+            if self.label_file_format == LabelFileFormat.YOLO:
+                label_file_name += TXT_EXT
+                label_file.save_yolo_format(str(self.labels_dir_path.joinpath(label_file_name)),
+                                            shapes, 
+                                            str(self.images_dir_path.joinpath(image_file_name)),
+                                            image,
+                                            self.tracker.label_hist)
+            elif self.label_file_format == LabelFileFormat.PASCAL_VOC:
+                label_file_name += XML_EXT
+                label_file.save_pascal_voc_format(str(self.labels_dir_path.joinpath(label_file_name)),
+                                                    shapes, 
+                                                    str(self.images_dir_path.joinpath(image_file_name)), 
+                                                    image)
+            elif self.label_file_format == LabelFileFormat.CREATE_ML:
+                label_file_name += JSON_EXT
+                label_file.save_create_ml_format(str(self.labels_dir_path.joinpath(label_file_name)),
+                                                    shapes, 
+                                                    str(self.images_dir_path.joinpath(image_file_name)),
+                                                    image,
+                                                    self.tracker.label_hist)
 
     def change_save_dir_dialog(self, _value=False):
         if self.timer.isActive():
@@ -410,6 +430,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             
         self.filterDialog.exec()
         self.interval_frame = self.filterDialog.getInterval()
+        self.motion_status = self.filterDialog.getMotionSetting()
         self.filterDialog.hide()
         
         if not self.timer.isActive() and self.current_video_index != -1:
@@ -425,6 +446,7 @@ class MainWidget(QtWidgets.QWidget):
         super().__init__()
         self.debug = debug
         self.class_path = class_path
+        self.windows = []
 
         # --------------------------------------------
         #                Top Part
@@ -440,11 +462,12 @@ class MainWidget(QtWidgets.QWidget):
         pixmap = QtGui.QPixmap("./demo/trackingUI.png") 
         screen = QtWidgets.QDesktopWidget().screenGeometry()
         width = int(screen.width() * 0.2)
-        height = int(screen.height() * 0.22)
+        height = int(screen.height() * 0.2)
         pixmap = pixmap.scaled(width, height)
         imagelabel.setPixmap(pixmap)
+        imagelabel.setScaledContents(True)
+        imagelabel.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         imageVLayout.addWidget(imagelabel)
-        imageVLayout.addStretch(0)
         topHLayout.addLayout(imageVLayout)
 
 		# painter
@@ -568,7 +591,6 @@ class MainWidget(QtWidgets.QWidget):
         _layout = QtWidgets.QVBoxLayout()
         _layout.setSpacing(10)
         _layout.addLayout(topHLayout)
-        # _layout.addStretch(1)
         _layout.addLayout(bottomVLayout)
         _layout.addLayout(btnHLayout)
         self.setLayout(_layout)
@@ -582,10 +604,12 @@ class MainWidget(QtWidgets.QWidget):
     def __btnMonitor(self) :
         sendingBtn = self.sender()
         if (sendingBtn.objectName() == "QPushBtn_tracking") :
-            self.win = MainWindow(default_prefdef_class_file = self.class_path,
-                                  debug=self.debug)
-            self.win.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-            self.win.show()
+            win = MainWindow(default_prefdef_class_file=self.class_path, debug=self.debug)
+            win.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+            win.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
+            win.show()
+            win.destroyed.connect(partial(self.onWindowClosed, win))
+            self.windows.append(win) 
 
     def recolorPixmap(self, pixmap, color):
         image = pixmap.toImage()
@@ -600,6 +624,10 @@ class MainWidget(QtWidgets.QWidget):
                     image.setPixelColor(x, y, new_color)
         
         return QtGui.QPixmap.fromImage(image)
+
+    def onWindowClosed(self, win):
+        if win in self.windows:
+            self.windows.remove(win)
 
 def main(argv=[]):
     """construct main app and run it"""
