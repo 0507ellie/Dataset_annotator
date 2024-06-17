@@ -8,11 +8,11 @@ except ImportError:
 
 from typing import *
 from base64 import b64encode, b64decode
-from libs.pascal_voc_io import PascalVocWriter
-from libs.yolo_io import YOLOWriter
-from libs.pascal_voc_io import XML_EXT
-from libs.create_ml_io import CreateMLWriter
-from libs.create_ml_io import JSON_EXT
+from .pascal_voc_io import PascalVocWriter
+from .yolo_io import YOLOWriter
+from .pascal_voc_io import XML_EXT
+from .create_ml_io import CreateMLWriter
+from .create_ml_io import JSON_EXT
 from enum import Enum
 import numpy as np
 import os.path

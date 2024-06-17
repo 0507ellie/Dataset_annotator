@@ -9,7 +9,7 @@ import re
 import os
 import sys
 import locale
-from libs.ustr import ustr
+from .ustr import ustr
 
 try:
     from qtpy.QtCore import *

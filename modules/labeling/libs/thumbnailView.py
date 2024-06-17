@@ -12,11 +12,11 @@ from xml.dom.minidom import parse
 from collections import OrderedDict
 from dataclasses import dataclass
 
-from libs.ustr import ustr
-from libs.yolo_io import TXT_EXT, YoloReader
-from libs.pascal_voc_io import XML_EXT, PascalVocReader
-from libs.create_ml_io import JSON_EXT, CreateMLReader
-from libs.labelFile import LabelFileFormat, LabelFile
+from .ustr import ustr
+from .yolo_io import TXT_EXT, YoloReader
+from .pascal_voc_io import XML_EXT, PascalVocReader
+from .create_ml_io import JSON_EXT, CreateMLReader
+from .labelFile import LabelFileFormat, LabelFile
 
 BTN_QSS =  '''
 	QPushButton:pressed {

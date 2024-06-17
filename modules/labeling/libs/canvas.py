@@ -1,7 +1,7 @@
 from qtpy import QtCore, QtGui, QtWidgets
 
-from libs.shape import Shape
-from libs.utils import distance
+from .shape import Shape
+from .utils import distance
 import math 
 
 CURSOR_DEFAULT = QtCore.Qt.ArrowCursor

@@ -1,5 +1,5 @@
 from math import sqrt
-from libs.ustr import ustr
+from .ustr import ustr
 import hashlib
 import re
 import sys

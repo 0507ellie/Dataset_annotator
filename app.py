@@ -5,12 +5,22 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 import labelingTool
 import trackingTool
-import createDataBase
 import convertFormat
+import createDataBase
+from labelingTool import *
+from trackingTool import *
+from convertFormat import *
 from modules import qdarkstyle
 from modules.guideSideBar import MainWindow
 from modules.tracking.libs.style import TABLE_QSS, BTN_QSS
 from modules.logger import Logger
+
+'''
+# Bundles Python Application (For linux)
+$ pyinstaller --paths=~/Desktop/Code/Platform/Annotator/modules/:modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
+$ ./app
+'''
+
 
 debug = Logger(None, logging.INFO, logging.INFO )
 
@@ -86,7 +96,7 @@ if __name__ == "__main__":
     # Load the qdarkstyle stylesheet
     dark_stylesheet = qdarkstyle.load_stylesheet_pyqt5()
     # Load the custom stylesheet
-    style_file = QtCore.QFile("./modules/style.qss")
+    style_file = QtCore.QFile(str(Path(__file__).resolve().parent / "modules/style.qss"))
     style_file.open(QtCore.QFile.ReadOnly | QtCore.QFile.Text)
     custom_stylesheet = QtCore.QTextStream(style_file).readAll()
     style_file.close()

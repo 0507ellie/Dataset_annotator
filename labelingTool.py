@@ -9,6 +9,7 @@ import shutil
 import sys
 import webbrowser as wb
 from functools import partial
+from pathlib import Path
 from qtpy import QtCore, QtGui, QtWidgets
 # Note : pyrcc5 -o resources/resources.py resources/resources.qrc
 
@@ -1865,7 +1866,7 @@ class MainWidget(QtWidgets.QWidget):
 		imageVLayout.addWidget(titleLabel)
 		imagelabel = QtWidgets.QLabel()
 		imagelabel.setStyleSheet("border: 2px solid rgb(29, 233, 182);")
-		pixmap = QtGui.QPixmap("./demo/labelingUI.png") 
+		pixmap = QtGui.QPixmap(str(Path(__file__).resolve().parent / "demo/labelingUI.png")) 
 		screen = QtWidgets.QDesktopWidget().screenGeometry()
 		width = int(screen.width() * 0.2)
 		height = int(screen.height() * 0.2)

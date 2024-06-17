@@ -471,7 +471,8 @@ class MainWidget(QtWidgets.QMainWindow):
 		self.labelList = QtWidgets.QListWidget()
 		self.labelList.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 		self.labelList.setMinimumHeight(100) 
-		[self.labelList.addItem(label) for label in self.label_hist]
+		if self.label_hist:
+			[self.labelList.addItem(label) for label in self.label_hist]
 		labelVLayout.setSpacing(5)
 		labelVLayout.addWidget(labelLabel)
 		labelVLayout.addWidget(self.labelList)
