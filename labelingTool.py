@@ -1641,7 +1641,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		if self.default_save_dir is not None and len(ustr(self.default_save_dir)):
 			if self.file_path:
 				image_file_name = os.path.basename(self.file_path)
-				print(os.path.splitext(image_file_name))
 				saved_file_name = os.path.splitext(image_file_name)[0]
 				saved_path = os.path.join(ustr(self.default_save_dir), saved_file_name)
 				self._save_file(saved_path)
@@ -1950,15 +1949,17 @@ class MainWidget(QtWidgets.QWidget):
 		keyboardLabel.setStyleSheet("color: rgb(255, 255, 255);")
 		keyboardLabel.setFont(QtGui.QFont('Lucida', 10, QtGui.QFont.Bold))
 		bottomVLayout.addWidget(keyboardLabel)
-		data1 = { '『D』' : "Open the next Image", 
-				  '『A』' : "Open the previous Image",
-				  '『w』' : "Draw a new box",
-				  '『Delete』': "Remove the box",
-				  '『Ctrl+C』' : "Create a duplicate of the selected box",
-				  '『Ctrl+S』' : "Save the labels to a file",
-				  '『Ctrl+E』' : "Modify the label of the selected Box",
-				  '『Ctrl+Q』' : "Quit application", }
-		keyboardTableWidget = QtWidgets.QTableWidget(len(data1), 2)
+		data1 = { '『Ctrl+U』': [":/open-dir", "Open images/label Dir"], 
+				  '『Ctrl+R』': [":/save-dir", "Change default saved label dir"], 
+           		  '『D』' : [':/next', "Open the next Image"],  
+				  '『A』' : [':/prev', "Open the previous Image"], 
+				  '『w』' : [':/new', "Draw a new box"], 
+				  '『Delete』': [':/delete', "Remove the box"], 
+				  '『Ctrl+C』' : [':/copy', "Create a duplicate of the selected box"], 
+				  '『Ctrl+S』' : [':/save', "Save the labels to a file"], 
+				  '『Ctrl+E』' : [':/edit',"Modify the label of the selected Box"], 
+				  '『Ctrl+Q』' : [':/quit',"Quit application"], } 
+		keyboardTableWidget = QtWidgets.QTableWidget(len(data1), 3) 
 		keyboardTableWidget.setStyleSheet(TABLE_QSS)
 		keyboardTableWidget.setFrameShape(QtWidgets.QFrame.NoFrame)
 		keyboardTableWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
@@ -1974,14 +1975,24 @@ class MainWidget(QtWidgets.QWidget):
 		keyboardTableWidget.horizontalHeader().setStretchLastSection(True)
 		keyboardTableWidget.verticalHeader().setVisible(False)
 		keyboardTableWidget.verticalHeader().setCascadingSectionResizes(False)
-		keyboardTableWidget.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-		keyboardTableWidget.setHorizontalHeaderLabels(["Actions", "Describe"])
+		keyboardTableWidget.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch) 
+		keyboardTableWidget.setHorizontalHeaderLabels(["Actions", "Icon", "Describe"]) 
 		for n, item in enumerate(data1.keys()):
-			newitem = QtWidgets.QTableWidgetItem(item)
-			keyboardTableWidget.setItem(n, 0, newitem)
+			newitem = QtWidgets.QTableWidgetItem(item) 
+			newitem.setTextAlignment(QtCore.Qt.AlignCenter) 
+			keyboardTableWidget.setItem(n, 0, newitem) 
 			
-			newitem = QtWidgets.QTableWidgetItem(data1[item])
-			keyboardTableWidget.setItem(n, 1, newitem)
+			newitem = QtWidgets.QTableWidgetItem() 
+			newitem.setTextAlignment(QtCore.Qt.AlignCenter) 
+			icon = QtGui.QIcon(data1[item][0]) 
+			pixmap_size = QtCore.QSize(50, 50) 
+			pixmap = icon.pixmap(pixmap_size) 
+			scaled_pixmap = pixmap.scaled(pixmap_size) 
+			newitem.setIcon(QtGui.QIcon(scaled_pixmap)) 
+			keyboardTableWidget.setItem(n, 1, newitem) 
+            	 
+			newitem = QtWidgets.QTableWidgetItem(data1[item][1]) 
+			keyboardTableWidget.setItem(n, 2, newitem) 
 		keyboardTableWidget.resizeColumnsToContents()
 		bottomVLayout.addWidget(keyboardTableWidget)
 
@@ -2015,6 +2026,20 @@ class MainWidget(QtWidgets.QWidget):
 								  debug=self.debug)
 			self.win.set_qdarkstyle()
 			self.win.show()
+
+	def recolorPixmap(self, pixmap, color): 
+		image = pixmap.toImage() 
+		 
+		# Loop through all the pixels in the image and change the color 
+		for x in range(image.width()): 
+			for y in range(image.height()): 
+				pixel_color = image.pixelColor(x, y) 
+				if pixel_color.alpha() > 0:  # Only recolor non-transparent pixels 
+					new_color = QtGui.QColor(color) 
+					new_color.setAlpha(pixel_color.alpha())  # Preserve original alpha 
+					image.setPixelColor(x, y, new_color) 
+		 
+		return QtGui.QPixmap.fromImage(image) 
 
 def main(argv=[]):
 	"""construct main app and run it"""
