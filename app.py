@@ -1,4 +1,3 @@
-import os
 import sys
 import logging
 from pathlib import Path
@@ -15,7 +14,7 @@ from modules.logger import Logger
 
 '''
 # Bundles Python Application (For linux)
-$ pyinstaller --paths=~/Desktop/Code/Platform/Annotator/modules/:modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
+$ pyinstaller --paths=./Annotator/modules/:modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
 $ ./app
 
 # Bundles Python Application (For windows)

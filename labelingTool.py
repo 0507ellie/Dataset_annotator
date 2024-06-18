@@ -971,7 +971,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			if line_color:
 				shape.line_color = QtGui.QColor(*line_color)
 			else:
-				shape.line_color = generate_color_by_text(label)
+				shape.line_color = generate_color_by_text(label, alpha=150)
 			
 			if fill_color:
 				shape.fill_color = QtGui.QColor(*fill_color)
@@ -1328,7 +1328,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		else :
 			assert not self.image.isNull(), "cannot paint null image"
 			self.canvas.scale = 0.01 * self.zoom_widget.value()
-			self.canvas.label_font_size = int(0.02 * max(self.image.width(), self.image.height()))
+			self.canvas.label_font_size = int(0.015 * max(self.image.width(), self.image.height()))
 			self.canvas.adjustSize()
 			self.canvas.update()
 
@@ -1404,6 +1404,27 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		natural_sort(images, key=lambda x: x.lower())
 		return images
 
+	def check_annotation_file_exist(self) :
+		labels = []
+		for file in Path(self.default_save_dir).iterdir():
+			if file.suffix.lower() in (XML_EXT, TXT_EXT, JSON_EXT):
+				labels.append(str(file.stem))
+
+		self.loading = LoadingExtension(self)
+		self.loading.startLoading()
+		for index in range(self.file_list_widget.count()):
+			step = max(int(self.file_list_widget.count()//10), 1)
+			if index%step == 0:
+				QtWidgets.QApplication.processEvents()
+			item_widget = self.file_list_widget.item(index)
+			self.loading.setProgress(int((index/(self.file_list_widget.count()-1))*100))
+			saved_file_name = os.path.basename(item_widget.text())
+			if os.path.splitext(saved_file_name)[0]  not in labels:
+				item_widget.setBackground(QtGui.QColor('brown'))
+			else :
+				item_widget.setBackground(QtGui.QColor( 'darkslategrey'))   
+		self.loading.loadingFinished()
+
 	def change_save_dir_dialog(self, _value=False):
 		if self.default_save_dir is not None:
 			path = ustr(self.default_save_dir)
@@ -1413,7 +1434,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		dir_path = ustr(QtWidgets.QFileDialog.getExistingDirectory(self,
 														 '%s - Save annotations to the directory' % APPNAME, path,  QtWidgets.QFileDialog.ShowDirsOnly
 														 | QtWidgets.QFileDialog.DontResolveSymlinks))
-
 		if dir_path is not None and len(dir_path) > 1:
 			self.default_save_dir = dir_path
 			self.check_annotation_file_exist()
@@ -1429,27 +1449,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		backbround_color = 'brown' if not os.path.isfile(annotation_file_path) else 'darkslategrey' # '#19232D'
 		for item in self.file_list_widget.findItems(self.file_path, QtCore.Qt.MatchExactly) :
 			self.file_list_widget.item(self.file_list_widget.row(item)).setBackground(QtGui.QColor(backbround_color))
-
-	def check_annotation_file_exist(self) :
-		save_name_list = []
-		for root, dirs, files in os.walk(self.default_save_dir):
-			for file in files:
-				if file.lower().endswith((XML_EXT, TXT_EXT, JSON_EXT)) :
-					save_name_list.append(file[:-4])
-
-		self.loading = LoadingExtension(self)
-		self.loading.startLoading()
-		for index in range(self.file_list_widget.count()):
-			if index%(self.file_list_widget.count()//10) == 0:
-				QtWidgets.QApplication.processEvents()
-			item_widget = self.file_list_widget.item(index)
-			self.loading.setProgress(int((index/(self.file_list_widget.count()-1))*100))
-			saved_file_name = os.path.basename(item_widget.text())
-			if os.path.splitext(saved_file_name)[0]  not in save_name_list :
-				item_widget.setBackground(QtGui.QColor('brown'))
-			else :
-				item_widget.setBackground(QtGui.QColor( 'darkslategrey'))   
-		self.loading.loadingFinished()
 
 	def open_annotation_dialog(self, _value=False):
 		if self.file_path is None:
@@ -1484,7 +1483,17 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			target_dir_path = ustr(default_open_dir_path)
 		self.last_open_dir = target_dir_path
 		self.import_dir_images(target_dir_path)
-		if self.default_save_dir is not None:
+		if len(target_dir_path) > 1:
+			subfolders = [item for item in Path(target_dir_path).iterdir() if item.is_dir()]
+			if len(subfolders) == 2:
+				for folder in subfolders:
+					if not self.scan_all_images(str(target_dir_path / folder)):
+						self.default_save_dir = str(target_dir_path / folder)
+			else:
+				if len(subfolders) > 2:
+					self.statusBar().showMessage(f"Directory [{target_dir_path}] contains more than two subfolders can't find labels folder.")
+					self.statusBar().show()
+				self.default_save_dir = target_dir_path
 			self.check_annotation_file_exist()
 
 	def import_dir_images(self, dir_path):
@@ -1498,6 +1507,9 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
 		self.m_img_list = self.scan_all_images(dir_path) 
 		self.img_count = len(self.m_img_list)
+		if self.img_count == 0:
+			self.statusBar().showMessage(f"Directory [{dir_path}] can't find images.")
+			self.statusBar().show()
 		self.open_next_image()
 		for imgPath in self.m_img_list:
 			item = QtWidgets.QListWidgetItem(imgPath)
@@ -1528,7 +1540,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.loading.startLoading()
 
 		for index in range(self.file_list_widget.count()):
-			if index%(self.file_list_widget.count()//10) == 0:
+			step = max(int(self.file_list_widget.count()//10), 1)
+			if index%step == 0:
 				QtWidgets.QApplication.processEvents()
 			self.loading.setProgress(int((index/(self.file_list_widget.count()-1))*100))
 			image_path = self.file_list_widget.item(index).text()
@@ -1628,6 +1641,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		if self.default_save_dir is not None and len(ustr(self.default_save_dir)):
 			if self.file_path:
 				image_file_name = os.path.basename(self.file_path)
+				print(os.path.splitext(image_file_name))
 				saved_file_name = os.path.splitext(image_file_name)[0]
 				saved_path = os.path.join(ustr(self.default_save_dir), saved_file_name)
 				self._save_file(saved_path)
