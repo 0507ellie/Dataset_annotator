@@ -417,7 +417,7 @@ class ThumbnailView(QDialog):
 																		shapes, 
 																		image_QWidget.image_id.image_path, 
 																		image_QWidget.image_id.image, 
-																		self.parent.label_hist)
+																		self.parent.tagLineEdit.tags)
 								elif self.parent.label_file_format.value == LabelFileFormat.CREATE_ML.value:
 									t_ml_parse_reader = CreateMLReader(image_QWidget.image_id.annotation_path, image_QWidget.image_id.image_path)
 									shapes += [ dict(label=label, points=points, difficult=difficult) 
@@ -426,7 +426,7 @@ class ThumbnailView(QDialog):
 																			shapes, 
 																			image_QWidget.image_id.image_path, 
 																			image_QWidget.image_id.image, 
-																			self.parent.label_hist)
+																			self.parent.tagLineEdit.tags)
 								else:
 									pass
 								self.debug.info(f"File '{image_QWidget.image_id}' deleted successfully.")
