@@ -985,8 +985,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		items_text_list = [str(self.label_list.item(i).text()) for i in range(self.label_list.count())]
 		unique_text_list = list(set(items_text_list))
 		# Add a null row for showing all the labels
-		unique_text_list.append("All")
 		unique_text_list.sort()
+		unique_text_list.insert(0, "All")
 		self.combo_box.update_items(unique_text_list)
 
 	def save_labels(self, annotation_file_path):
