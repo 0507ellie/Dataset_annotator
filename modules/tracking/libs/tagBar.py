@@ -45,7 +45,7 @@ class DraggableTag(QtWidgets.QFrame):
     def mouseMoveEvent(self, event):
         if not (event.buttons() & QtCore.Qt.LeftButton):
             return
-        if (event.pos() - self.drag_start_position).manhattanLength() < QtWidgets.QApplication.startDragDistance():
+        if self.drag_start_position and (event.pos() - self.drag_start_position).manhattanLength() < QtWidgets.QApplication.startDragDistance():
             return
         drag = QtGui.QDrag(self)
         mime_data = QtCore.QMimeData()
@@ -63,7 +63,7 @@ class DraggableTag(QtWidgets.QFrame):
         event.setDropAction(QtCore.Qt.MoveAction)
         event.accept()
         source = event.source()
-        target_layout = self.parentWidget().tagsHlayout
+        target_layout = self.parent.tagsHlayout  # Access the parent's tagsHlayout
         target_index = target_layout.indexOf(self)
         target_layout.insertWidget(target_index, source)
         source.setStyleSheet(self.original_style)
@@ -82,21 +82,35 @@ class TagBar(QtWidgets.QWidget):
         super(TagBar, self).__init__(parent)
         self.parent = parent
         self.tags = []
+        
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scroll_area.setMaximumHeight(40)
+        self.scroll_area.setStyleSheet("QScrollBar:horizontal {border: none; background: rgb(52, 59, 72); height: 5px; margin: 0px 15px 0 15px; border-radius: 0px;}")
+        
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_area.setWidget(self.scroll_widget)
+        
         self.tagsHlayout = QtWidgets.QHBoxLayout()
         self.tagsHlayout.setAlignment(QtCore.Qt.AlignLeft)
-        self.tagsHlayout.setSpacing(4)
-        
+        self.tagsHlayout.setContentsMargins(2, 2, 2, 2)
+        self.scroll_widget.setLayout(self.tagsHlayout)
+
         self.line_edit = QtWidgets.QLineEdit()
         self.line_edit.setFixedSize(100, 28)
-        self.line_edit.setStyleSheet('border-radius: 8px;')
+        self.line_edit.setStyleSheet('border-radius: 8px; ')
         self.line_edit.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Maximum)
         self.line_edit.returnPressed.connect(self.create_tags)
         self.line_edit.installEventFilter(self)
         self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         self.setContentsMargins(2, 2, 2, 2)
-        self.tagsHlayout.setContentsMargins(2, 2, 2, 2)
+        self.main_layout = QtWidgets.QHBoxLayout()
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.addWidget(self.scroll_area)
+        self.setLayout(self.main_layout)
         self.refresh()
-        self.setLayout(self.tagsHlayout)
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.FocusOut and source is self.line_edit:

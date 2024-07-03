@@ -267,11 +267,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		classHLayout.addWidget(self.tagLabel)
 		self.tagLineEdit = TagBar(self)
 		self.tagLineEdit.load_tags(label_hist)
-		self.tagLineEdit.setStyleSheet(" margin: 0px; padding: 0px; background-color: rgb(27,29,35); border: 0.5px solid white; border-radius: 15px; color : rgb(200, 200, 200);" )
+		self.tagLineEdit.setStyleSheet("margin: 0px; padding: 0px; background-color: rgb(27,29,35);  border-radius: 15px; color : rgb(200, 200, 200);" )
 		classHLayout.addWidget(self.tagLineEdit)
-		classHLayout.addStretch(1)
 		mainVLayout.addLayout(classHLayout)
-		
+  
 		scroll = QtWidgets.QScrollArea()
 		scroll.setWidget(self.canvas)
 		scroll.setWidgetResizable(True)
@@ -280,8 +279,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			QtCore.Qt.Horizontal: scroll.horizontalScrollBar()
 		}
 		self.scroll_area = scroll
-
-		mainVLayout.addWidget(scroll)
+		
+		mainVLayout.addWidget(scroll, 1)
 		self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.label_dock)
 		self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.file_dock)
 		central_widget = QtWidgets.QWidget()
