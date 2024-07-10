@@ -12,7 +12,7 @@ from dds_cloudapi_sdk import (
 from PIL import Image
 import concurrent.futures
 
-class GroundingDINOAPIWrapper:
+class GroundingDINOCloud:
     """API wrapper for Grounding DINO 1.5
 
     Args:

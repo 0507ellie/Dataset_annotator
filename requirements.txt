@@ -8,4 +8,9 @@ opencv-contrib-python==4.9.0.80
 QtPy
 PyYAML
 requests
+
+# Auto-Label
 dds_cloudapi_sdk
+onnxruntime==1.17.3
+tokenizers
+qimage2ndarray

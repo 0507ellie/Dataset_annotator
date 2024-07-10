@@ -202,6 +202,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.timer.timeout.connect(self.update_image)
 
         self.default_save_dir  = default_save_dir
+        self.images_dir_path = None
+        self.labels_dir_path = None
         if default_filedir:
             video_paths = [str(item) for item in Path(default_filedir).iterdir() if item.is_file()]
             self.load_video_files(video_paths)
@@ -420,6 +422,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
         if dir_path is not None and len(dir_path) > 1:
             self.default_save_dir = dir_path
+            self.init_save_folder(str(Path(self.video_files[self.current_video_index]).stem), Path(self.default_save_dir))
             
         if not self.timer.isActive() and self.current_video_index != -1:
             self.timer.start(1000 // self.fps)

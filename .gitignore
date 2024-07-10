@@ -1,2 +1,3 @@
 __pycache__/
-video/240426144347.mp4
+
+models/*.onnx

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 import argparse
 import codecs
 import os.path
@@ -179,6 +177,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		use_model_qhbox.addWidget(self.model_button, alignment=QtCore.Qt.AlignLeft)
 		use_model_qhbox.addWidget(self.model_label, alignment=QtCore.Qt.AlignLeft)
 		use_model_qhbox.addWidget(self.modelspbox, alignment=QtCore.Qt.AlignLeft)
+		use_model_qhbox.addStretch(1)
 		use_model_container = QtWidgets.QWidget()
 		use_model_container.setLayout(use_model_qhbox)
 
@@ -825,7 +824,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		if self.file_path != None:
 			self.loading = LoadingExtension(self)
 			self.loading.startLoading()
-
+   
 			prompts = dict(image=self.file_path, prompt='.'.join(self.tagLineEdit.tags))
 			self._thread = InferenceThread(prompts)
 			self._thread.inferenceFinished.connect(self.auto_label_result)
@@ -856,7 +855,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			box2_area = (w2 + 1) * (h2 + 1)
 			
 			return intersection_area / float(box1_area + box2_area - intersection_area)
-		
 		if "error" not in data.keys():
 			shapes = [format_shape(shape) for shape in self.canvas.shapes]
 			for box, category, score in zip(data['boxes'], data['categorys'], data['scores']):
@@ -873,7 +871,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			self.set_clean()
 			self.set_dirty()
 		else:
-			self.statusBar().showMessage("Auto detect timed out. Please try again later.")
+			self.error_message(u'Error Auto-Label', data['error'])
 
 	# Tzutalin 20160906 : Add file list and dock to move faster
 	def file_item_double_clicked(self, item=None):
@@ -1950,7 +1948,7 @@ class MainWidget(QtWidgets.QWidget):
 		bottomVLayout.addWidget(keyboardLabel)
 		data1 = { '『Ctrl+U』': [":/open-dir", "Open images/label Dir"], 
 				  '『Ctrl+R』': [":/save-dir", "Change default saved label dir"], 
-           		  '『D』' : [':/next', "Open the next Image"],  
+		   		  '『D』' : [':/next', "Open the next Image"],  
 				  '『A』' : [':/prev', "Open the previous Image"], 
 				  '『w』' : [':/new', "Draw a new box"], 
 				  '『Delete』': [':/delete', "Remove the box"], 
@@ -1989,7 +1987,7 @@ class MainWidget(QtWidgets.QWidget):
 			scaled_pixmap = pixmap.scaled(pixmap_size) 
 			newitem.setIcon(QtGui.QIcon(scaled_pixmap)) 
 			keyboardTableWidget.setItem(n, 1, newitem) 
-            	 
+				 
 			newitem = QtWidgets.QTableWidgetItem(data1[item][1]) 
 			keyboardTableWidget.setItem(n, 2, newitem) 
 		keyboardTableWidget.resizeColumnsToContents()
