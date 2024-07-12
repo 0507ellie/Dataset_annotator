@@ -1,7 +1,14 @@
+import concurrent.futures
 import tempfile
-from typing import Dict, List, Union
+import sys
 import numpy as np
-from dds_cloudapi_sdk import (
+from PIL import Image
+from typing import Dict, List, Union
+from pathlib import Path
+
+script_dir = Path(__file__).resolve().parent
+sys.path.append(str(script_dir))
+from .dds_cloudapi_sdk import (
     DetectionTask,
     Client,
     Config,
@@ -9,8 +16,6 @@ from dds_cloudapi_sdk import (
     DetectionModel,
     DetectionTarget,
 )
-from PIL import Image
-import concurrent.futures
 
 class GroundingDINOCloud:
     """API wrapper for Grounding DINO 1.5

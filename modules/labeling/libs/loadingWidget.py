@@ -2,9 +2,9 @@ import time
 from qtpy import QtCore, QtGui, QtWidgets
 
 class Loader(QtWidgets.QWidget):
-    def __init__(self, parent):
+    def __init__(self, text='Loading...', parent=None):
         super().__init__(parent)
-
+        self.text = text
         self.gradient = QtGui.QConicalGradient(.5, .5, 0)
         self.gradient.setCoordinateMode(self.gradient.ObjectBoundingMode)
         self.gradient.setColorAt(.25, QtCore.Qt.transparent)
@@ -62,7 +62,7 @@ class Loader(QtWidgets.QWidget):
         color.setAlpha(max(color.alpha() * .5, 128))
         qp.fillRect(self.rect(), color)
 
-        text = 'Loading...' if self.progress is None else f'Loading... {self.progress}%'
+        text = self.text if self.progress is None else f'{self.text} {self.progress}%'
         textWidth = self.fontMetrics().horizontalAdvance(text)
         textHeight = self.fontMetrics().height()
 
@@ -93,9 +93,9 @@ class LoadingExtension:
         self.parent = parent
         self.loader = None
 
-    def startLoading(self):
+    def startLoading(self, text=None):
         if self.loader is None:
-            self.loader = Loader(self.parent)
+            self.loader = Loader(text if text else 'Loading...', self.parent)
             self.loader.setWindowModality(QtCore.Qt.WindowModal)
         self.loader.start()
 

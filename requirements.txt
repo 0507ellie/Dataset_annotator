@@ -1,5 +1,6 @@
 lxml
-pillow
+numpy==1.24.4
+pillow==10.2.0
 packaging
 PyQt5==5.14.2
 pyqt5ac
@@ -7,10 +8,10 @@ opencv-python==4.9.0.80
 opencv-contrib-python==4.9.0.80
 QtPy
 PyYAML
-requests
+requests==2.31.0
 
 # Auto-Label
-dds_cloudapi_sdk
 onnxruntime==1.17.3
 tokenizers
 qimage2ndarray
+pydantic==2.6.3

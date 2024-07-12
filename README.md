@@ -1,4 +1,4 @@
-# Annotator (v1.0.3)
+# Annotator (v1.0.4)
 <p>
     <a href="#"><img alt="Python" src="https://img.shields.io/badge/Python-14354C.svg?logo=python&logoColor=white"></a>
     <a href="#"><img alt="PyQT5" src="https://img.shields.io/badge/PyQT5-49D.svg?logo=Qt&logoColor=white"></a>
@@ -37,6 +37,10 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
     depend on, and they will be installed using:
     ```bash
     $ pip install -r requirements.txt
+    
+    # uv is an extremely fast Python package installer and resolver
+    $ pip install uv
+    $ uv pip install -r requirements.txt
     ```
 
 3) **Build Resource File:**

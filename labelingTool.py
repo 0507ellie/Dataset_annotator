@@ -1,5 +1,5 @@
-import argparse
 import codecs
+import argparse
 import os.path
 import logging
 import platform
@@ -25,6 +25,7 @@ from modules.labeling.libs.shape import DEFAULT_FILL_COLOR, DEFAULT_LINE_COLOR, 
 from modules.labeling.libs.stringBundle import StringBundle
 from modules.labeling.libs.thumbnailView import ThumbnailView
 from modules.labeling.libs.toolBar import ToolBar
+from modules.labeling.libs.switchBtn import SwitchBtn
 from modules.labeling.libs.ustr import ustr
 from modules.labeling.libs.utils import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
@@ -165,22 +166,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		use_default_label_container = QtWidgets.QWidget()
 		use_default_label_container.setLayout(use_default_label_qhbox_layout)
 
-		# Create a widget for using auto model label
-		self.model_button = QtWidgets.QToolButton()
-		self.model_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
-		self.model_label = QtWidgets.QLabel("Overlap Rate:")
-		self.modelspbox = QtWidgets.QDoubleSpinBox() 
-		self.modelspbox.setValue(0.6)
-		self.modelspbox.setRange(0.1, 1)
-		self.modelspbox.setSingleStep(0.05) 
-		use_model_qhbox = QtWidgets.QHBoxLayout()
-		use_model_qhbox.addWidget(self.model_button, alignment=QtCore.Qt.AlignLeft)
-		use_model_qhbox.addWidget(self.model_label, alignment=QtCore.Qt.AlignLeft)
-		use_model_qhbox.addWidget(self.modelspbox, alignment=QtCore.Qt.AlignLeft)
-		use_model_qhbox.addStretch(1)
-		use_model_container = QtWidgets.QWidget()
-		use_model_container.setLayout(use_model_qhbox)
-
 		# Create and add combobox for showing unique labels in group
 		use_display_label_qhbox_layout = QtWidgets.QHBoxLayout()
 		self.display_label = QtWidgets.QLabel("Display Label :")
@@ -203,7 +188,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		# Add some of widgets to label_list_layout
 		label_list_layout.addWidget(use_box_size_container)
 		label_list_layout.addWidget(use_edit_label_container)
-		label_list_layout.addWidget(use_model_container)
 		label_list_layout.addWidget(use_default_label_container)
 		label_list_layout.addWidget(use_display_label_container)
 		label_list_layout.addWidget(self.label_list)
@@ -216,6 +200,73 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.dock_features = QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetFloatable
 		self.label_dock.setFeatures(self.dock_features)
 
+		# ==================================================
+		#                     Model
+		# ==================================================
+		model_list_layout = QtWidgets.QVBoxLayout()
+		model_list_layout.setContentsMargins(0, 0, 0, 0)
+
+		# Create a widget for using auto model label
+		mode_label = QtWidgets.QLabel("Mode:")
+		self.mode_btn = SwitchBtn("Online", "Offline")
+		self.autolabel_btn = QtWidgets.QToolButton()
+		self.autolabel_btn.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+		modelHLayout = QtWidgets.QHBoxLayout()
+		modelHLayout.addWidget(mode_label, alignment=QtCore.Qt.AlignLeft)
+		modelHLayout.addWidget(self.mode_btn, alignment=QtCore.Qt.AlignLeft)
+		modelHLayout.addStretch(1)
+		modelHLayout.addWidget(self.autolabel_btn, alignment=QtCore.Qt.AlignRight)
+		use_model_container = QtWidgets.QWidget()
+		use_model_container.setLayout(modelHLayout)
+
+		# Create a widget for overlap box
+		overlap_title_label = QtWidgets.QLabel("Overlap Rate:")
+		self.overlap_slider = QtWidgets.QSlider()
+		self.overlap_slider.setObjectName('QSlider_overlap')
+		self.overlap_slider.setRange(1, 100)
+		self.overlap_slider.setOrientation(1)
+		self.overlap_slider.setTickPosition(2) # Add tick marks below
+		self.overlap_slider.setTickInterval(10) # Tick mark spacing (there will be 10 tick marks)
+		self.overlap_slider.setValue(60)
+		self.overlap_slider.valueChanged.connect(self.__sliderMonitor)
+		self.overlap_label = QtWidgets.QLabel(str(self.overlap_slider.value()/100.0))
+		overlapHLayout = QtWidgets.QHBoxLayout()
+		overlapHLayout.addWidget(overlap_title_label)
+		overlapHLayout.addWidget(self.overlap_slider)
+		overlapHLayout.addWidget(self.overlap_label)
+		use_overlap_container = QtWidgets.QWidget()
+		use_overlap_container.setLayout(overlapHLayout)
+
+		# Create a widget for thres
+		confs_title_label = QtWidgets.QLabel("Confs Rate:")
+		self.confs_slider = QtWidgets.QSlider()
+		self.confs_slider.setObjectName('QSlider_confs')
+		self.confs_slider.setRange(30, 100)
+		self.confs_slider.setOrientation(1)
+		self.confs_slider.setTickPosition(2) # Add tick marks below
+		self.confs_slider.setTickInterval(5) # Tick mark spacing (there will be 10 tick marks)
+		self.confs_slider.setValue(30)
+		self.confs_slider.valueChanged.connect(self.__sliderMonitor)
+		self.confs_label = QtWidgets.QLabel(str(self.confs_slider.value()/100.0))
+		confsHLayout = QtWidgets.QHBoxLayout()
+		confsHLayout.addWidget(confs_title_label)
+		confsHLayout.addWidget(self.confs_slider)
+		confsHLayout.addWidget(self.confs_label)
+		use_confs_container = QtWidgets.QWidget()
+		use_confs_container.setLayout(confsHLayout)
+  
+		model_list_layout.addWidget(use_model_container)
+		model_list_layout.addWidget(use_overlap_container)
+		model_list_layout.addWidget(use_confs_container)
+		model_list_layout.addStretch(1)
+		model_list_container = QtWidgets.QWidget()
+		model_list_container.setLayout(model_list_layout)
+
+		self.model_dock = QtWidgets.QDockWidget("Auto Label", self)
+		self.model_dock.setObjectName(get_str('labels'))
+		self.model_dock.setWidget(model_list_container)
+		self.model_dock.setFeatures(self.dock_features)
+  
 		# ==================================================
 		#                   File List
 		# ==================================================
@@ -281,6 +332,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		
 		mainVLayout.addWidget(scroll, 1)
 		self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.label_dock)
+		self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.model_dock)
 		self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.file_dock)
 		central_widget = QtWidgets.QWidget()
 		central_widget.setLayout(mainVLayout)
@@ -299,7 +351,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		model = action(get_str('autoLabel'), self.auto_create_label,
 					  'Ctrl+M', 'model', get_str('autoLabelDetail'),
 					  enabled=False, text_wrap=False)
-		self.model_button.setDefaultAction(model)
+		self.autolabel_btn.setDefaultAction(model)
 
 		quit = action(get_str('quit'), self.close,
 					  'Ctrl+Q', 'quit', get_str('quitApp'))
@@ -607,6 +659,14 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.debug.changelevel(level)
 		self.debug.debug("Change [ %s ] debug level." % APPNAME )
 
+	def __sliderMonitor(self):
+		sendingBtn = self.sender()
+		if (sendingBtn.objectName() == "QSlider_overlap") :
+			self.overlap_label.setText(str(self.overlap_slider.value()/100.0))
+
+		if (sendingBtn.objectName() =="QSlider_confs") :
+			self.confs_label.setText(str(self.confs_slider.value()/100.0))
+
 	# Support Functions #
 	def set_format(self, save_format):
 		if save_format == FORMAT_PASCALVOC:
@@ -822,12 +882,11 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
 	def auto_create_label(self):
 		if self.file_path != None:
+			prompts = dict(image=self.file_path, prompt='.'.join(self.tagLineEdit.tags))
+			self._thread = InferenceThread(self.mode_btn.label, prompts, self)
+			self._thread.inferenceFinished.connect(self.auto_label_result)
 			self.loading = LoadingExtension(self)
 			self.loading.startLoading()
-   
-			prompts = dict(image=self.file_path, prompt='.'.join(self.tagLineEdit.tags))
-			self._thread = InferenceThread(prompts)
-			self._thread.inferenceFinished.connect(self.auto_label_result)
 			self._thread.start()
 
 	def auto_label_result(self, data):
@@ -858,12 +917,14 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		if "error" not in data.keys():
 			shapes = [format_shape(shape) for shape in self.canvas.shapes]
 			for box, category, score in zip(data['boxes'], data['categorys'], data['scores']):
+				if score < float(self.confs_label.text()):
+					continue
 				x_min, y_min, x_max, y_max = map(int, box)
 				points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
 				new_shape = [category, points, None, None, False]
 
 				# Determine whether the new shape is similar to an existing shape
-				similar_shapes = [shape for shape in shapes if similarity(shape[1], new_shape[1]) > self.modelspbox.value()]
+				similar_shapes = [shape for shape in shapes if similarity(shape[1], new_shape[1]) > float(self.overlap_label.text())]
 				if not similar_shapes:
 					shapes.append(new_shape)
 			self.label_list.clear()
@@ -1383,7 +1444,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		settings[SETTING_DRAW_SQUARE] = self.draw_rectangles_option.isChecked()
 		settings[SETTING_LABEL_FILE_FORMAT] = self.label_file_format
 		settings.save()
-
+		
 	def load_recent(self, filename):
 		if self.may_continue():
 			self.load_file(filename)
