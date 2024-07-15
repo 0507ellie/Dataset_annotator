@@ -15,9 +15,15 @@ except ImportError:
     QT5 = False
 
 
-def new_icon(icon):
-    return QIcon(':/' + icon)
+# def new_icon(icon):
+#     return QIcon(':/' + icon)
 
+def new_icon(icon, size=None):
+    qicon = QIcon(':/' + icon)
+    if size:
+        pixmap = qicon.pixmap(size, size)
+        qicon = QIcon(pixmap)
+    return  qicon
 
 def new_button(text, icon=None, slot=None):
     b = QPushButton(text)
@@ -29,13 +35,13 @@ def new_button(text, icon=None, slot=None):
 
 
 def new_action(parent, text, slot=None, shortcut=None, icon=None,
-               tip=None, checkable=False, enabled=True, text_wrap=True):
+               tip=None, checkable=False, enabled=True, text_wrap=True, font=QFont("Arial", 7)):
     """Create a new action and assign callbacks, shortcuts, etc."""
     a = QAction(text, parent)
     if icon is not None:
         if text_wrap:
             a.setIconText(text.replace(" ", "\n"))
-        a.setIcon(new_icon(icon))
+        a.setIcon(new_icon(icon, 16))
     if shortcut is not None:
         if isinstance(shortcut, (list, tuple)):
             a.setShortcuts(shortcut)
@@ -48,6 +54,8 @@ def new_action(parent, text, slot=None, shortcut=None, icon=None,
         a.triggered.connect(slot)
     if checkable:
         a.setCheckable(True)
+    if font is not None:
+        a.setFont(font)
     a.setEnabled(enabled)
     return a
 

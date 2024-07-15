@@ -1,13 +1,14 @@
 import pickle
 import os
 import sys
+from pathlib import Path
 
 class Settings(object):
     def __init__(self):
         # Be default, the home will be in the same folder as labelImg
-        home = os.getcwd()
+        home = Path.cwd()
         self.data = {}
-        self.path = os.path.join(home, '.labelingToolSettings.pkl')
+        self.path = str(Path.cwd() / '.labelingToolSettings.pkl')
 
     def __setitem__(self, key, value):
         self.data[key] = value

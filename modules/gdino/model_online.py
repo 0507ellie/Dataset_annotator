@@ -6,9 +6,7 @@ from PIL import Image
 from typing import Dict, List, Union
 from pathlib import Path
 
-script_dir = Path(__file__).resolve().parent
-sys.path.append(str(script_dir))
-from .dds_cloudapi_sdk import (
+from dds_cloudapi_sdk import (
     DetectionTask,
     Client,
     Config,

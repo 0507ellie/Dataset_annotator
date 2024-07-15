@@ -1,8 +1,8 @@
-import cv2, os
-import time
+import cv2, os, sys
 import numpy as np
 import onnxruntime as ort
 from typing import Dict
+from pathlib import Path
 from tokenizers import Tokenizer
 from qtpy.QtCore import QCoreApplication
 
@@ -13,7 +13,7 @@ class Args:
         self.__dict__.update(kwargs)
 
 class OnnxBaseModel:
-    def __init__(self, model_path, device_type: str = "gpu"):
+    def __init__(self, model_path: str, device_type: str = "gpu"):
         self.sess_opts = ort.SessionOptions()
         if "OMP_NUM_THREADS" in os.environ:
             self.sess_opts.inter_op_num_threads = int(
@@ -57,14 +57,15 @@ class GroundingDINOLocal:
     """Open-Set object detection model using Grounding_DINO"""
 
     def __init__(self, model_config=None) -> None:
+        self.net = None
         self.config = model_config
+        if not self.config : return 
         model_abs_path = self.config["model_path"]
         if not model_abs_path or not os.path.isfile(model_abs_path):
             QCoreApplication.translate(
                 "Model",
                 f"Could not download or initialize {self.config['model_type']} model.",
             )
-            self.net = None
         else:
             self.net = OnnxBaseModel(
                 model_abs_path, device_type=self.config["device"]
@@ -208,15 +209,13 @@ class GroundingDINOLocal:
             return []
 
         if not self.net:
-            return {"error" : f"Could not initialize {self.config['model_type']} model. Please check path or download mdoel."}
+            return {"error" : f"Could not initialize model. Please check path or download model."}
         
         blob, inputs, caption = self.preprocess(image, text_prompt)
-        start_time = time.time()
+
         outputs = self.net.get_ort_inference(
             blob, inputs=inputs, extract=False
         )
-        end_time = time.time()
-        print("Inference time: {:.3f}s".format(end_time - start_time))
 
         boxes_filt, pred_phrases = self.postprocess(outputs, caption)
 
@@ -365,8 +364,8 @@ class GroundingDINOLocal:
 
     @staticmethod
     def get_tokenizer():
-        current_dir = os.path.dirname(__file__)
-        config_json_file = f"{current_dir}/bert_base_uncased_tokenizer.json"
+        current_dir = Path(__file__).resolve().parents[2] / "modules" / "gdino"
+        config_json_file = f"{str(current_dir)}/bert_base_uncased_tokenizer.json"
         tokenizer = Tokenizer.from_file(config_json_file)
         return tokenizer
 

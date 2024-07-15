@@ -1,9 +1,12 @@
 from qtpy import QtCore, QtGui, QtWidgets
 from resources.resources  import *
 
+__version_info__ = ('1', '0', '4')
+__version__ = '.'.join(__version_info__)
+
 class MainWindow(object):
     def setupUi(self, MainWindow):
-        MainWindow.setWindowTitle("MainWindow")
+        MainWindow.setWindowTitle("Annotator-" + __version__)
         MainWindow.resize(950, 600)
         MainWindow.setWindowIcon(QtGui.QIcon(":/app/logo"))
         self.centralwidget = QtWidgets.QWidget(MainWindow)

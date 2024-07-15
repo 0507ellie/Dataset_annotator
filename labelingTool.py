@@ -1,5 +1,6 @@
 import codecs
 import argparse
+import subprocess
 import os.path
 import logging
 import platform
@@ -32,7 +33,7 @@ from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.loadingWidget import LoadingExtension
 from modules.labeling.libs.zoomWidget import ZoomWidget
 from modules.tracking.libs.tagBar import TagBar
-from modules.gdino import InferenceThread
+from modules.gdino import MODEL_DIR, InferenceThread, CreateThread
 from modules import qdarkstyle
 from modules.tracking.libs.style import TABLE_QSS, BTN_QSS
 from resources.resources  import *
@@ -114,6 +115,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.shapes_to_items = {}
 		self.prev_label_text = ''
 
+		dock_font = QtGui.QFont("Arial", 7)
+		self.dock_features = QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetFloatable
 		# ==================================================
 		#                   boxLabelText
 		# ==================================================
@@ -122,58 +125,80 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		label_list_layout.setSpacing(1)  # Adjust this value as needed
 
 		# Create box size ratio
-		use_box_size_qhbox_layout = QtWidgets.QHBoxLayout()
 		self.use_box_size_checkbox = QtWidgets.QCheckBox("Box Size Ratio :")
+		self.use_box_size_checkbox.setFont(dock_font)
 		self.use_box_size_checkbox.setChecked(False)
 		self.use_box_size_checkbox.stateChanged.connect(self.change_box_size_ratio)
-		use_box_size_qhbox_layout.addWidget(self.use_box_size_checkbox)
 		self.Wspbox = QtWidgets.QSpinBox()
+		self.Wspbox.setMinimumHeight(10) 
+		self.Wspbox.setMaximumHeight(30) 
 		self.Wspbox.setValue(48)
 		self.Wspbox.setRange(1, 160)
 		self.Wspbox.setEnabled(False)
 		self.Wspbox.valueChanged.connect(self.change_box_size_ratio)
-		use_box_size_qhbox_layout.addWidget(self.Wspbox, QtCore.Qt.AlignLeft)
 		self.Hlabel = QtWidgets.QLabel(" x ")
-		use_box_size_qhbox_layout.addWidget(self.Hlabel)
 		self.Hspbox = QtWidgets.QSpinBox()
+		self.Hspbox.setMinimumHeight(10) 
+		self.Hspbox.setMaximumHeight(30) 
 		self.Hspbox.setValue(48)
 		self.Hspbox.setRange(1, 160)
 		self.Hspbox.setEnabled(False)
 		self.Hspbox.valueChanged.connect(self.change_box_size_ratio)
-		use_box_size_qhbox_layout.addWidget(self.Hspbox, QtCore.Qt.AlignLeft)
+
+		boxSizelHlayout = QtWidgets.QHBoxLayout()
+		boxSizelHlayout.setContentsMargins(5, 10, 10, 5) 
+		boxSizelHlayout.addWidget(self.use_box_size_checkbox)
+		boxSizelHlayout.addWidget(self.Wspbox, QtCore.Qt.AlignLeft)
+		boxSizelHlayout.addWidget(self.Hlabel)
+		boxSizelHlayout.addWidget(self.Hspbox, QtCore.Qt.AlignLeft)
 		use_box_size_container = QtWidgets.QWidget()
-		use_box_size_container.setLayout(use_box_size_qhbox_layout)
+		use_box_size_container.setLayout(boxSizelHlayout)
 
 		# Create a widget for edit and diffc button
-		use_edit_label_qvbox_layout = QtWidgets.QHBoxLayout()
 		self.edit_button = QtWidgets.QToolButton()
 		self.edit_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+		self.edit_button.setMinimumHeight(25) 
+		self.edit_button.setMaximumHeight(30) 
 		self.diffc_button = QtWidgets.QCheckBox(get_str('useDifficult'))
+		self.diffc_button.setFont(dock_font)
 		self.diffc_button.setChecked(False)
 		self.diffc_button.stateChanged.connect(self.button_state)
-		use_edit_label_qvbox_layout.addWidget(self.edit_button)
-		use_edit_label_qvbox_layout.addWidget(self.diffc_button)
+
+		editLabelHlayout = QtWidgets.QHBoxLayout()
+		editLabelHlayout.setContentsMargins(5, 5, 0, 10) 
+		editLabelHlayout.addWidget(self.edit_button)
+		editLabelHlayout.addWidget(self.diffc_button)
 		use_edit_label_container = QtWidgets.QWidget()
-		use_edit_label_container.setLayout(use_edit_label_qvbox_layout)
+		use_edit_label_container.setLayout(editLabelHlayout)
 
 		# Create a widget for using default label
 		self.use_default_label_checkbox = QtWidgets.QCheckBox(get_str('useDefaultLabel'))
+		self.use_default_label_checkbox.setFont(dock_font)
 		self.use_default_label_checkbox.setChecked(False)
 		self.default_label_text_line = QtWidgets.QLineEdit()
-		use_default_label_qhbox_layout = QtWidgets.QHBoxLayout()
-		use_default_label_qhbox_layout.addWidget(self.use_default_label_checkbox)
-		use_default_label_qhbox_layout.addWidget(self.default_label_text_line)
+		self.default_label_text_line.setMinimumHeight(10) 
+		self.default_label_text_line.setMaximumHeight(30)  
+
+		defaultLabelHlayout = QtWidgets.QHBoxLayout()
+		defaultLabelHlayout.setContentsMargins(5, 5, 10, 5) 
+		defaultLabelHlayout.addWidget(self.use_default_label_checkbox)
+		defaultLabelHlayout.addWidget(self.default_label_text_line)
 		use_default_label_container = QtWidgets.QWidget()
-		use_default_label_container.setLayout(use_default_label_qhbox_layout)
+		use_default_label_container.setLayout(defaultLabelHlayout)
 
 		# Create and add combobox for showing unique labels in group
-		use_display_label_qhbox_layout = QtWidgets.QHBoxLayout()
 		self.display_label = QtWidgets.QLabel("Display Label :")
-		self.combo_box = ComboBox(self)
-		use_display_label_qhbox_layout.addWidget(self.display_label)
-		use_display_label_qhbox_layout.addWidget(self.combo_box, QtCore.Qt.AlignLeft)
+		self.display_label.setFont(dock_font)
+		self.combo_box = ComboBox(self) 
+		self.combo_box.cb.setMinimumHeight(10) 
+		self.combo_box.cb.setMaximumHeight(30) 
+
+		displayLabelHlayout = QtWidgets.QHBoxLayout()
+		displayLabelHlayout.setContentsMargins(5, 0, 0, 5) 
+		displayLabelHlayout.addWidget(self.display_label)
+		displayLabelHlayout.addWidget(self.combo_box, QtCore.Qt.AlignLeft)
 		use_display_label_container = QtWidgets.QWidget()
-		use_display_label_container.setLayout(use_display_label_qhbox_layout)
+		use_display_label_container.setLayout(displayLabelHlayout)
 
 		# Create and add a widget for showing current label items
 		label_menu = QtWidgets.QMenu()
@@ -197,7 +222,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.label_dock = QtWidgets.QDockWidget(get_str('boxLabelText'), self)
 		self.label_dock.setObjectName(get_str('labels'))
 		self.label_dock.setWidget(label_list_container)
-		self.dock_features = QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetFloatable
 		self.label_dock.setFeatures(self.dock_features)
 
 		# ==================================================
@@ -207,11 +231,17 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		model_list_layout.setContentsMargins(0, 0, 0, 0)
 
 		# Create a widget for using auto model label
-		mode_label = QtWidgets.QLabel("Mode:")
+		mode_label = QtWidgets.QLabel("Mode : ")
+		mode_label.setFont(dock_font)
 		self.mode_btn = SwitchBtn("Online", "Offline")
+		self.mode_btn.clicked.connect(self.auto_model_load)
 		self.autolabel_btn = QtWidgets.QToolButton()
 		self.autolabel_btn.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+		self.autolabel_btn.setMinimumHeight(10) 
+		self.autolabel_btn.setMaximumHeight(30)  
+
 		modelHLayout = QtWidgets.QHBoxLayout()
+		modelHLayout.setContentsMargins(5, 10, 10, 10) 
 		modelHLayout.addWidget(mode_label, alignment=QtCore.Qt.AlignLeft)
 		modelHLayout.addWidget(self.mode_btn, alignment=QtCore.Qt.AlignLeft)
 		modelHLayout.addStretch(1)
@@ -220,7 +250,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		use_model_container.setLayout(modelHLayout)
 
 		# Create a widget for overlap box
-		overlap_title_label = QtWidgets.QLabel("Overlap Rate:")
+		overlap_title_label = QtWidgets.QLabel("Overlap Rate : ")
+		overlap_title_label.setFont(dock_font)
 		self.overlap_slider = QtWidgets.QSlider()
 		self.overlap_slider.setObjectName('QSlider_overlap')
 		self.overlap_slider.setRange(1, 100)
@@ -230,7 +261,9 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.overlap_slider.setValue(60)
 		self.overlap_slider.valueChanged.connect(self.__sliderMonitor)
 		self.overlap_label = QtWidgets.QLabel(str(self.overlap_slider.value()/100.0))
+
 		overlapHLayout = QtWidgets.QHBoxLayout()
+		overlapHLayout.setContentsMargins(5, 0, 10, 0) 
 		overlapHLayout.addWidget(overlap_title_label)
 		overlapHLayout.addWidget(self.overlap_slider)
 		overlapHLayout.addWidget(self.overlap_label)
@@ -238,7 +271,8 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		use_overlap_container.setLayout(overlapHLayout)
 
 		# Create a widget for thres
-		confs_title_label = QtWidgets.QLabel("Confs Rate:")
+		confs_title_label = QtWidgets.QLabel("Confs Rate : ")
+		confs_title_label.setFont(dock_font)
 		self.confs_slider = QtWidgets.QSlider()
 		self.confs_slider.setObjectName('QSlider_confs')
 		self.confs_slider.setRange(30, 100)
@@ -248,7 +282,9 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		self.confs_slider.setValue(30)
 		self.confs_slider.valueChanged.connect(self.__sliderMonitor)
 		self.confs_label = QtWidgets.QLabel(str(self.confs_slider.value()/100.0))
+
 		confsHLayout = QtWidgets.QHBoxLayout()
+		confsHLayout.setContentsMargins(5, 0, 10, 10) 
 		confsHLayout.addWidget(confs_title_label)
 		confsHLayout.addWidget(self.confs_slider)
 		confsHLayout.addWidget(self.confs_label)
@@ -348,10 +384,11 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 					  'Ctrl+E', 'edit', get_str('editLabelDetail'),
 					  enabled=False, text_wrap=False)
 		self.edit_button.setDefaultAction(edit)
-		model = action(get_str('autoLabel'), self.auto_create_label,
+
+		infer_model = action(get_str('autoLabel'), self.auto_label_infer,
 					  'Ctrl+M', 'model', get_str('autoLabelDetail'),
 					  enabled=False, text_wrap=False)
-		self.autolabel_btn.setDefaultAction(model)
+		self.autolabel_btn.setDefaultAction(infer_model)
 
 		quit = action(get_str('quit'), self.close,
 					  'Ctrl+Q', 'quit', get_str('quitApp'))
@@ -437,13 +474,15 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 						  'Ctrl+A', 'hide', get_str('showAllBoxDetail'),
 						  enabled=False)
 
-		help_default = action(get_str('tutorialDefault'), self.show_default_tutorial_dialog, 
-							  None, 'help', get_str('tutorialDetail'))
-		show_info = action(get_str('info'), self.show_info_dialog, 
-						   None, 'help', get_str('info'))
-		show_shortcut = action(get_str('shortcut'), self.show_shortcuts_dialog, 
-							   None, 'help', get_str('shortcut'))
-
+		show_tutorial = action(get_str('tutorialDefault'), lambda: self.show_dialog('tutorial'), 
+							None, 'help', get_str('tutorialDetail'))
+		show_info = action(get_str('info'), lambda: self.show_dialog('info'), 
+						None, 'help', get_str('info'))
+		show_shortcut = action(get_str('shortcut'), lambda: self.show_dialog('shortcut'), 
+							None, 'help', get_str('shortcut'))
+		show_modeldir = action(get_str('modelDir'), lambda: self.show_dialog('modeldir'), 
+							None, 'help', get_str('modelDir'))
+		
 		zoom = QtWidgets.QWidgetAction(self)
 		zoom.setDefaultWidget(self.zoom_widget)
 
@@ -492,7 +531,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 							  beginnerContext=(create, edit, copy, delete),
 							  advancedContext=(create_mode, edit_mode, edit, copy,
 											   delete, shape_line_color, shape_fill_color),
-							  onLoadActive=(close, create, model, create_mode, edit_mode),
+							  onLoadActive=(close, create, infer_model, create_mode, edit_mode),
 							  onShapesPresent=(save_as, hide_all, show_all))
 
 		self.menus = Struct(
@@ -539,7 +578,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 		else :
 			add_actions(self.menus.file,
 						(open, open_dir, open_annotation, change_save_dir, copy_prev_bounding, self.menus.recentFiles, save, save_format, save_as, close, reset_all, delete_image, quit))
-		add_actions(self.menus.help, (help_default, show_info, show_shortcut))
+		add_actions(self.menus.help, (show_tutorial, show_info, show_shortcut, show_modeldir))
 		add_actions(self.menus.view, (
 			self.auto_saving,
 			# self.single_class_mode,
@@ -788,36 +827,46 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 	def advanced(self):
 		return not self.beginner()
 
-	def show_tutorial_dialog(self, browser='default', link=None):
-		if link is None:
-			link = self.screencast
+	def show_dialog(self, name):
 
-		if browser.lower() == 'default':
-			wb.open(link, new=2)
-		elif browser.lower() == 'chrome' and platform.system() == 'Windows':
-			if shutil.which(browser.lower()):  # 'chrome' not in wb._browsers in windows
-				wb.register('chrome', None, wb.BackgroundBrowser('chrome'))
-			else:
-				chrome_path="D:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-				if os.path.isfile(chrome_path):
-					wb.register('chrome', None, wb.BackgroundBrowser(chrome_path))
-			try:
-				wb.get('chrome').open(link, new=2)
-			except:
+		def show_tutorial_dialog(browser='default', link=self.screencast):
+			if browser.lower() == 'default':
 				wb.open(link, new=2)
-		elif browser.lower() in wb._browsers:
-			wb.get(browser.lower()).open(link, new=2)
+			elif browser.lower() == 'chrome' and platform.system() == 'Windows':
+				if shutil.which(browser.lower()):  # 'chrome' not in wb._browsers in windows
+					wb.register('chrome', None, wb.BackgroundBrowser('chrome'))
+				else:
+					chrome_path="D:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+					if os.path.isfile(chrome_path):
+						wb.register('chrome', None, wb.BackgroundBrowser(chrome_path))
+				try:
+					wb.get('chrome').open(link, new=2)
+				except:
+					wb.open(link, new=2)
+			elif browser.lower() in wb._browsers:
+				wb.get(browser.lower()).open(link, new=2)
 
-	def show_default_tutorial_dialog(self):
-		self.show_tutorial_dialog(browser='default')
-
-	def show_info_dialog(self):
-		from modules.labeling.libs.__init__ import __version__
-		msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(APPNAME, __version__, sys.version_info)
-		QtWidgets.QMessageBox.information(self, u'Information', msg)
-
-	def show_shortcuts_dialog(self):
-		self.show_tutorial_dialog(browser='default', link='https://github.com/tzutalin/labelImg#Hotkeys')
+		if name == 'tutorial':
+			show_tutorial_dialog(browser='default')
+		elif name == 'info':
+			from modules.labeling.libs.__init__ import __version__
+			msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(APPNAME, __version__, sys.version_info)
+			QtWidgets.QMessageBox.information(self, u'Information', msg)
+		elif name == 'shortcut':
+			show_tutorial_dialog(browser='default', link='http://gitlab.mirle.com.tw/9b0/9bf/annotator')
+		elif name == "modeldir":
+			mdoel_dir = MODEL_DIR
+			if os.name == 'nt':  # Windows
+				subprocess.call(['start', mdoel_dir], shell=True)
+			elif os.name == 'posix':
+				if sys.platform == 'darwin':  # macOS
+					subprocess.call(['open', mdoel_dir])
+				else:  # Linux
+					subprocess.call(['xdg-open', mdoel_dir])
+			else:
+				print("Unsupported OS")
+		else:
+			self.status(f"Unknown action: {name}")
 
 	def create_shape(self):
 		assert self.beginner()
@@ -880,20 +929,22 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			self.set_dirty()
 			self.update_combo_box()
 
-	def auto_create_label(self):
+	def auto_model_load(self):
+		self._load_thread = CreateThread(self.mode_btn.label, self)
+		self._load_thread.message.connect(self.status)
+		self._load_thread.createLoaded.connect(self._load_thread._loading)
+		self._load_thread.createFinished.connect(InferenceThread._loading)
+		self._load_thread.start()
+
+	def auto_label_infer(self):
 		if self.file_path != None:
 			prompts = dict(image=self.file_path, prompt='.'.join(self.tagLineEdit.tags))
-			self._thread = InferenceThread(self.mode_btn.label, prompts, self)
-			self._thread.inferenceFinished.connect(self.auto_label_result)
-			self.loading = LoadingExtension(self)
-			self.loading.startLoading()
-			self._thread.start()
+			self._infer_thread = InferenceThread(self.mode_btn.label, prompts, self)
+			self._infer_thread.message.connect(self.status)
+			self._infer_thread.inferenceFinished.connect(self.auto_label_result)
+			self._infer_thread.start()
 
 	def auto_label_result(self, data):
-		self.loading.loadingFinished()
-		self._thread.quit()
-		self._thread.wait()
-		self._thread = None
 
 		def format_shape(s):
 			return [s.label, [(p.x(), p.y()) for p in s.points], s.line_color.getRgb(), s.fill_color.getRgb(), s.difficult]
@@ -1660,7 +1711,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 			return
 
 		filename = None
-		if self.file_path is None:
+		if self.file_path is None and len(self.m_img_list):
 			filename = self.m_img_list[0]
 			self.cur_img_idx = 0
 		else:

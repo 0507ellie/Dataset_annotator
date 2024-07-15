@@ -6,16 +6,18 @@ class SwitchBtn(QtWidgets.QPushButton):
         self.on_text = on_text
         self.close_text = close_text
         self.setCheckable(True)
-        self.setMinimumWidth(80)
-        self.setMinimumHeight(22)
+        self.setChecked(True)
+        self.setMinimumWidth(90)
+        self.setMinimumHeight(25) 
+        self.setMaximumHeight(30)  
         self.label = self.on_text if self.isChecked() else self.close_text
         
     def paintEvent(self, event):
         self.label = self.on_text if self.isChecked() else self.close_text
-        bg_color = QtCore.Qt.green if self.isChecked() else QtCore.Qt.red
+        bg_color =  QtGui.QColor("darkcyan") if self.isChecked() else QtGui.QColor("firebrick")
 
-        radius = 10
-        width = 35
+        radius = 12
+        width = 40
         center = self.rect().center()
 
         painter = QtGui.QPainter(self)
@@ -31,7 +33,7 @@ class SwitchBtn(QtWidgets.QPushButton):
         painter.setBrush(QtGui.QBrush(bg_color))
         
         # Set font properties
-        font = QtGui.QFont("Arial", 7, QtGui.QFont.Bold) 
+        font = QtGui.QFont("Arial", 6, QtGui.QFont.Bold) 
         painter.setFont(font)
         
         sw_rect = QtCore.QRect(-radius, -radius, width + radius, 2*radius)

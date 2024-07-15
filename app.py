@@ -14,11 +14,11 @@ from modules.logger import Logger
 
 '''
 # Bundles Python Application (For linux)
-$ pyinstaller --paths=./Annotator/modules/:modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
+$ pyinstaller --paths=./Annotator/modules/:modules  --add-data=./modules/style.qss:modules --add-data=./modules/gdino/*.json:modules/gdino --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
 $ ./app
 
 # Bundles Python Application (For windows)
-> pyinstaller --paths=./Annotator/modules/;modules --add-data=./modules/style.qss:modules --add-data=./demo/*:demo -F -w app.py --icon=./resources/icons/Logo.ico
+> pyinstaller --paths=./Annotator/modules/;modules  --add-data=./modules/style.qss;modules --add-data=./modules/gdino/*.json;modules/gdino --add-data=./demo/*:demo -F -w app.py --icon=./resources/icons/Logo.ico
 '''
 
 debug = Logger(None, logging.INFO, logging.INFO )
