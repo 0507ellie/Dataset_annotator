@@ -1515,9 +1515,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
 	def check_annotation_file_exist(self) :
 		labels = []
-		for file in Path(self.default_save_dir).iterdir():
-			if file.suffix.lower() in (XML_EXT, TXT_EXT, JSON_EXT):
-				labels.append(str(file.stem))
+		if self.default_save_dir and os.path.exists(self.default_save_dir):
+			for file in Path(self.default_save_dir).iterdir():
+				if file.suffix.lower() in (XML_EXT, TXT_EXT, JSON_EXT):
+					labels.append(str(file.stem))
 
 		self.loading = LoadingExtension(self)
 		self.loading.startLoading()
