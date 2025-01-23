@@ -117,11 +117,15 @@ class LabelFile(object):
         for shape in shapes:
             points = shape['points']
             label = shape['label']
+            type = shape['type']
             # Add Chris
             difficult = int(shape['difficult'])
-            bnd_box = LabelFile.convert_points_to_bnd_box(points)
-            writer.add_bnd_box(bnd_box[0], bnd_box[1], bnd_box[2], bnd_box[3], label, difficult)
-
+            if type == "rectangle":
+                bnd_box = LabelFile.convert_points_to_bnd_box(points)
+                writer.add_bnd_box(bnd_box[0], bnd_box[1], bnd_box[2], bnd_box[3], label, difficult)
+            else:
+                writer.add_seg_points(points, label, difficult)
+            
         writer.save(target_file=filename, class_list=class_list)
         return
 

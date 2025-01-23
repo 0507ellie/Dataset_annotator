@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
-import sys
+import numpy as np
 import os
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
@@ -18,7 +18,8 @@ class YOLOWriter:
         self.filename = filename
         self.database_src = database_src
         self.img_size = img_size
-        self.box_list = []
+        self.rectangle_list = []
+        self.polygon_list = []
         self.local_img_path = local_img_path
         self.verified = False
 
@@ -26,7 +27,13 @@ class YOLOWriter:
         bnd_box = {'xmin': x_min, 'ymin': y_min, 'xmax': x_max, 'ymax': y_max}
         bnd_box['name'] = name
         bnd_box['difficult'] = difficult
-        self.box_list.append(bnd_box)
+        self.rectangle_list.append(bnd_box)
+
+    def add_seg_points(self, points, name, difficult):
+        seg_box = {"points" : points}
+        seg_box['name'] = name
+        seg_box['difficult'] = difficult
+        self.polygon_list.append(seg_box)
 
     def bnd_box_to_yolo_line(self, box, class_list=[]):
         x_min = box['xmin']
@@ -37,8 +44,8 @@ class YOLOWriter:
         x_center = float((x_min + x_max)) / 2 / self.img_size[1]
         y_center = float((y_min + y_max)) / 2 / self.img_size[0]
 
-        w = float((x_max - x_min)) / self.img_size[1]
-        h = float((y_max - y_min)) / self.img_size[0]
+        width = float((x_max - x_min)) / self.img_size[1]
+        height = float((y_max - y_min)) / self.img_size[0]
 
         # PR387
         box_name = box['name']
@@ -47,8 +54,28 @@ class YOLOWriter:
 
         class_index = class_list.index(box_name)
 
-        return class_index, x_center, y_center, w, h
+        return f"{class_index} {x_center} {y_center} {width} {height}\n"
 
+    def poly_points_to_yolo_line(self, poly, class_list=[]):
+        points = poly["points"]
+        image_size = np.array([[self.img_size[1], self.img_size[0]]])
+        norm_points = points / image_size
+
+        # PR387
+        poly_name = poly['name']
+        if poly_name not in class_list:
+            class_list.append(poly_name)
+
+        class_index = class_list.index(poly_name)
+        return  (f"{class_index} "
+                    + " ".join(
+                        [
+                            " ".join([str(cell[0]), str(cell[1])])
+                            for cell in norm_points.tolist()
+                        ]
+                    )
+                + "\n")
+        
     def save(self, class_list=[], target_file=None):
 
         out_file = None  # Update yolo .txt
@@ -66,10 +93,13 @@ class YOLOWriter:
             out_class_file = open(classes_file, 'w')
 
 
-        for box in self.box_list:
-            class_index, x_center, y_center, w, h = self.bnd_box_to_yolo_line(box, class_list)
-            # print (classIndex, x_center, y_center, w, h)
-            out_file.write("%d %.6f %.6f %.6f %.6f\n" % (class_index, x_center, y_center, w, h))
+        for rect in self.rectangle_list:
+            line = self.bnd_box_to_yolo_line(rect, class_list)
+            out_file.write(line)
+
+        for poly in self.polygon_list:
+            line = self.poly_points_to_yolo_line(poly, class_list)
+            out_file.write(line)
 
         # print (classList)
         # print (out_class_file)
@@ -100,7 +130,6 @@ class YoloReader:
             self.classes = classes_file.read().strip('\n').split('\n')
         else :
             self.classes = self.class_list_path
-        # print (self.classes)
 
         img_size = [image.height(), image.width(),
                     1 if image.isGrayscale() else 3]
@@ -116,33 +145,35 @@ class YoloReader:
     def get_shapes(self):
         return self.shapes
 
-    def add_shape(self, label, x_min, y_min, x_max, y_max, difficult):
-
-        points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
-        self.shapes.append((label, points, None, None, difficult))
-
-    def yolo_line_to_shape(self, class_index, x_center, y_center, w, h):
-        try:
-            label = self.classes[int(class_index)]
-        except:
-            label = "unknown label"
-        x_min = max(float(x_center) - float(w) / 2, 0)
-        x_max = min(float(x_center) + float(w) / 2, 1)
-        y_min = max(float(y_center) - float(h) / 2, 0)
-        y_max = min(float(y_center) + float(h) / 2, 1)
-
-        x_min = round(self.img_size[1] * x_min)
-        x_max = round(self.img_size[1] * x_max)
-        y_min = round(self.img_size[0] * y_min)
-        y_max = round(self.img_size[0] * y_max)
-
-        return label, x_min, y_min, x_max, y_max
-
     def parse_yolo_format(self):
-        bnd_box_file = open(self.file_path, 'r')
-        for bndBox in bnd_box_file:
-            class_index, x_center, y_center, w, h = bndBox.strip().split(' ')
-            label, x_min, y_min, x_max, y_max = self.yolo_line_to_shape(class_index, x_center, y_center, w, h)
-
-            # Caveat: difficult flag is discarded when saved as yolo format.
-            self.add_shape(label, x_min, y_min, x_max, y_max, False)
+        lines = open(self.file_path, 'r')
+        for line in lines:
+            line = line.strip().split(" ")
+            class_index = int(line[0])
+            try:
+                label = self.classes[int(class_index)]
+            except:
+                label = "unknown"
+                
+            if len(line) == 5:
+                shape_type = "rectangle"
+                cx = float(line[1])
+                cy = float(line[2])
+                nw = float(line[3])
+                nh = float(line[4])
+                xmin = int((cx - nw / 2) * self.img_size[1])
+                ymin = int((cy - nh / 2) * self.img_size[0])
+                xmax = int((cx + nw / 2) * self.img_size[1])
+                ymax = int((cy + nh / 2) * self.img_size[0])
+                points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+            else:
+                shape_type = "polygon"
+                points, masks = [], line[1:]
+                image_size = np.array([self.img_size[1], self.img_size[0]], np.float64)
+                for x, y in zip(masks[0::2], masks[1::2]):
+                    point = [np.float64(x), np.float64(y)]
+                    point = np.array(point, np.float64) * image_size
+                    points.append(point.tolist())
+                    
+            difficult = False
+            self.shapes.append((label, shape_type, points, None, None, difficult))

@@ -1,4 +1,4 @@
-# Annotator (v1.0.4)
+# Annotator (v1.1.0.2501)
 <p>
     <a href="#"><img alt="Python" src="https://img.shields.io/badge/Python-14354C.svg?logo=python&logoColor=white"></a>
     <a href="#"><img alt="PyQT5" src="https://img.shields.io/badge/PyQT5-49D.svg?logo=Qt&logoColor=white"></a>
@@ -22,6 +22,9 @@ $ ./app or double click app
 
 # For Windows
 > app.exe or double click app
+
+# For CLI
+$ python app.py
 ```
 
 <h1 id="Dependecies">➤ Dependecies</h1>
@@ -47,10 +50,22 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
     This command utilizes the PyQt5 Resource Compiler (pyrcc5) tool. Its purpose is to compile a resource file (.qrc file) into Python code, allowing you to utilize these resources in your application, such as images, fonts, style sheets, etc.
     ```bash
-    $ sudo pyrcc5 -o resources/resources.py resources/resources.qrc
+    $ sudo pyrcc5 -o pages/resources/resources.py pages/resources/resources.qrc
     ```
 
 <h1 id="Usage">➤ Usage</h1>
+
+<div align="left">
+    <b>🚀 AnnotatorType </b>
+</div>
+
+| Annotator  Type  | Describe                                                   |
+|------------------|----------------------------------------------------------- |
+| Labeling         |Manual labeling is slower, but the error rate is lower.     |
+| Tracking         |Tracking mode is faster, but requires manual rechecking.    |
+| Convert          |Convert different label formats and merge multiple folders. |
+| Create           |Automatically convert, train, and split the dataset.        |
+
 
 ***Tracking Labeling Tool*** :
 
@@ -62,10 +77,10 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
     ```bash
     # methods 1: setting in the UI
-    $ python trackingTool.py
+    $ python app.py -t Tracking
 
     # methods 2: custom yourself
-    $ python trackingTool.py -i <path-to-video-dir> -c <path-to-txt-classes> -o <path-to-ouput-dir>
+    $ python app.py -t Tracking -i <path-to-video-dir> -c <path-to-txt-classes> -o <path-to-ouput-dir>
     ```
 
     Description of CLI all arguments:
@@ -103,10 +118,10 @@ Note: It is recommended to create a virtual environment under Anaconda for insta
 
     ```bash
     # methods 1: setting in the UI
-    $ python labelingTool.py
+    $ python app.py --task Labeling
 
     # method 2: custom yourself
-    $ python labelingTool.py -i <path-to-image-dir> -c <path-to-txt-classes> -o <path-to-label-dir>
+    $ python app.py --task Labeling -i <path-to-image-dir> -c <path-to-txt-classes> -o <path-to-label-dir>
     ```
 
     Description of CLI all arguments:

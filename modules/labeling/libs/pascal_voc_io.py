@@ -146,7 +146,7 @@ class PascalVocReader:
         x_max = int(float(bnd_box.find('xmax').text))
         y_max = int(float(bnd_box.find('ymax').text))
         points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
-        self.shapes.append((label, points, None, None, difficult))
+        self.shapes.append((label, "rectangle", points, None, None, difficult))
 
     def parse_xml(self):
         assert self.file_path.endswith(XML_EXT), "Unsupported file format"

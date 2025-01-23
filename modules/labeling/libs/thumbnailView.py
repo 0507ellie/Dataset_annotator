@@ -266,9 +266,9 @@ class ThumbnailView(QDialog):
 
 		t_yolo_parse_reader = YoloReader(src_label_path, image, self.parent.classes_file)
 		shapes = t_yolo_parse_reader.get_shapes()
-		for idx, (label, points, line_color, fill_color, difficult) in enumerate(shapes):
+		for idx, (label, type, points, line_color, fill_color, difficult) in enumerate(shapes):
 			if (label != self.displaytext.text()): continue
-			
+			if type != "rectangle": continue # TODO: add poly case
 			info = ThumbnailInfo(src_frame_path, src_label_path, image, label, difficult,
 								 xmin = points[0][0],
 								 ymin = points[0][1],
@@ -287,7 +287,7 @@ class ThumbnailView(QDialog):
 
 		t_voc_parse_reader = PascalVocReader(src_label_path) 
 		shapes = t_voc_parse_reader.get_shapes()
-		for idx, (label, points, line_color, fill_color, difficult) in enumerate(shapes):
+		for idx, (label, type, points, line_color, fill_color, difficult) in enumerate(shapes):
 			if (label != self.displaytext.text()): continue
 			
 			info = ThumbnailInfo(src_frame_path, src_label_path, image, label, difficult,
@@ -308,7 +308,7 @@ class ThumbnailView(QDialog):
 
 		create_ml_parse_reader = CreateMLReader(src_label_path, src_frame_path)
 		shapes = create_ml_parse_reader.get_shapes()
-		for idx, (label, points, line_color, fill_color, difficult) in enumerate(shapes):
+		for idx, (label, type, points, line_color, fill_color, difficult) in enumerate(shapes):
 			if (label != self.displaytext.text()): continue
 			
 			info = ThumbnailInfo(src_frame_path, src_label_path, image, label, difficult,

@@ -3,22 +3,19 @@ import logging
 from pathlib import Path
 from qtpy import QtCore, QtGui, QtWidgets
 
-import labelingTool
-import trackingTool
-import convertFormat
-import createDataBase
+from pages import labelingTool, trackingTool, convertFormat, createDataBase
+from pages.guideSideBar import MainWindow, AnnotatorType
 from modules import qdarkstyle
-from modules.guideSideBar import MainWindow
 from modules.tracking.libs.style import TABLE_QSS, BTN_QSS
 from modules.logger import Logger
 
 '''
 # Bundles Python Application (For linux)
-$ pyinstaller --paths=./Annotator/modules/:modules  --add-data=./modules/style.qss:modules --add-data=./modules/gdino/*.json:modules/gdino --add-data=./demo/*:demo  -F -w app.py --icon=./resources/icons/Logo.ico
+$ pyinstaller --paths=./Annotator/modules/:modules  --add-data=./modules/style.qss:modules --add-data=./modules/gdino/*.json:modules/gdino --add-data=./demo/*:demo  -F -w app.py --icon=./pages/resources/icons/Logo.ico
 $ ./app
 
 # Bundles Python Application (For windows)
-> pyinstaller --paths=./Annotator/modules/;modules  --add-data=./modules/style.qss;modules --add-data=./modules/gdino/*.json;modules/gdino --add-data=./demo/*:demo -F -w app.py --icon=./resources/icons/Logo.ico
+> pyinstaller --paths=./Annotator/modules/;modules  --add-data=./modules/style.qss;modules --add-data=./modules/gdino/*.json;modules/gdino --add-data=./demo/*:demo -F -w app.py --icon=./pages/resources/icons/Logo.ico
 '''
 
 debug = Logger(None, logging.INFO, logging.INFO )
@@ -93,7 +90,7 @@ class GuideWindow(QtWidgets.QMainWindow):
         self.ui.stackedWidget.setCurrentIndex(3)
 
 
-if __name__ == "__main__":
+def main(argv=[]):
     app = QtWidgets.QApplication(sys.argv)
 
     # Load the qdarkstyle stylesheet
@@ -109,8 +106,41 @@ if __name__ == "__main__":
     # Create and show the main window
     window = GuideWindow()
     window.show()
+    return app.exec()
 
-    sys.exit(app.exec())
+if __name__ == "__main__":
+    import argparse
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument(
+        "--task", '-t', 
+        default=None, 
+        type=AnnotatorType.argparse_type, 
+        choices=list(AnnotatorType), 
+        help='Choose a task type. Valid options: ' + ', '.join([t.name for t in AnnotatorType])
+    )
+    args, unknown = argparser.parse_known_args() # Parse known parameters and ignore unknown parameters
+
+    task: AnnotatorType = args.task
+    if task:
+        debug.info(f'Selected task: {task.name}')
+        argv = [sys.argv[0]] + unknown if unknown else [sys.argv[0]]
+        debug.info(f"Final argv: {argv}")
+        
+        if task == AnnotatorType.Labeling:
+            labelingTool.main(argv)
+        elif task == AnnotatorType.Tracking:
+            trackingTool.main(argv)
+        elif task == AnnotatorType.Convert:
+            convertFormat.main(argv)
+        elif task == AnnotatorType.Create:
+            createDataBase.main(argv)
+        else:
+            debug.error(f"Unsupported task type: {task.name}")
+    else:
+        debug.info('No task provided. Running default guide.')
+        sys.exit(main(sys.argv))
+
+
 
 
 

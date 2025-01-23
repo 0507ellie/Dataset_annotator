@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import sys
+import math
 import cv2
 import argparse
 import codecs
@@ -11,27 +12,26 @@ from functools import partial
 from qtpy import QtCore, QtGui, QtWidgets
 from typing import *
 
-from modules import qdarkstyle
-from modules.logger import Logger
-from resources.resources  import *
-from modules.labeling.libs.canvas import Canvas
-from modules.labeling.libs.colorDialog import ColorDialog
-from modules.labeling.libs.constants import *
-from modules.labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
-from modules.labeling.libs.hashableQListWidgetItem import HashableQListWidgetItem
-from modules.labeling.libs.labelDialog import LabelDialog
-from modules.labeling.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
-from modules.labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
-from modules.labeling.libs.settings import Settings
-from modules.labeling.libs.shape import DEFAULT_FILL_COLOR, DEFAULT_LINE_COLOR, Shape
-from modules.labeling.libs.stringBundle import StringBundle
-from modules.labeling.libs.toolBar import ToolBar
-from modules.labeling.libs.ustr import ustr
-from modules.labeling.libs.utils import *
-from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
-from modules.labeling.libs.zoomWidget import ZoomWidget
-
-from modules.tracking.libs.tagBar import TagBar
+from ... import qdarkstyle
+from ...logger import Logger
+from ...labeling.libs.canvas import Canvas
+from ...labeling.libs.colorDialog import ColorDialog
+from ...labeling.libs.constants import *
+from ...labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
+from ...labeling.libs.hashableQListWidgetItem import HashableQListWidgetItem
+from ...labeling.libs.labelDialog import LabelDialog
+from ...labeling.libs.labelFile import LabelFile, LabelFileError, LabelFileFormat
+from ...labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
+from ...labeling.libs.settings import Settings
+from ...labeling.libs.shape import DEFAULT_FILL_COLOR, DEFAULT_LINE_COLOR, Shape
+from ...labeling.libs.stringBundle import StringBundle
+from ...labeling.libs.toolBar import ToolBar
+from ...labeling.libs.ustr import ustr
+from ...labeling.libs.utils import *
+from ...labeling.libs.yolo_io import TXT_EXT, YoloReader
+from ...labeling.libs.zoomWidget import ZoomWidget
+from ...tracking.libs.tagBar import TagBar
+from pages.resources.resources import *
 
 TITLE = 'LabelPainter'
 debug = Logger(None, logging.INFO, logging.INFO )
@@ -136,10 +136,10 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
 
         create = action(get_str('crtBox'), self.create_shape,
                         'w', 'new', get_str('crtBoxDetail'), enabled=False, text_wrap=False)
-        delete = action(get_str('delBox'), self.delete_selected_shape,
-                        'Delete', 'delete', get_str('delBoxDetail'), enabled=False, text_wrap=False)
-        copy = action(get_str('dupBox'), self.copy_selected_shape,
-                      'Ctrl+C', 'copy', get_str('dupBoxDetail'),
+        delete = action(get_str('delObj'), self.delete_selected_shape,
+                        'Delete', 'delete', get_str('delObjDetail'), enabled=False, text_wrap=False)
+        copy = action(get_str('dupObj'), self.copy_selected_shape,
+                      'Ctrl+C', 'copy', get_str('dupObjDetail'),
                       enabled=False, text_wrap=False)
         color1 = action(get_str('boxLineColor'), self.choose_color1,
                         'Ctrl+L', 'color_line', get_str('boxLineColorDetail'))
@@ -391,8 +391,8 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
 
     def load_labels(self, shapes):
         s = []
-        for label, points, line_color, fill_color, difficult in shapes:
-            shape = Shape(label=label)
+        for label, type, points, line_color, fill_color, difficult in shapes:
+            shape = Shape(label=label, shape_type=type)
             for x, y in points:
 
                 # Ensure the labels are within the bounds of the image. If not, fix them.
@@ -469,10 +469,13 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             self.canvas.reset_all_lines()
 
     def scroll_request(self, delta, orientation):
-        units = - delta / (8 * 15)
-        bar = self.scroll_bars[orientation]
-        # bar.setValue(bar.value() + bar.singleStep() * units)
-        bar.setValue(int(bar.value() + bar.singleStep() * units))
+        units = -delta * 0.1  # natural scroll
+        scroll_bar = self.scroll_bars[orientation]
+        value = scroll_bar.value() + scroll_bar.singleStep() * units
+        self.set_scroll(orientation, value)
+
+    def set_scroll(self, orientation, value):
+        self.scroll_bars[orientation].setValue(round(value))
 
     def set_zoom(self, value):
         self.actions.fitWidth.setChecked(False)
@@ -480,60 +483,36 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.zoom_mode = self.MANUAL_ZOOM
         self.zoom_widget.setValue(value)
 
-    def add_zoom(self, increment=10):
-        self.set_zoom(self.zoom_widget.value() + increment)
+    def add_zoom(self, increment=1.1):
+        zoom_value = self.zoom_widget.value() * increment
+        if increment > 1:
+            zoom_value = math.ceil(zoom_value)
+        else:
+            zoom_value = math.floor(zoom_value)
+        self.set_zoom(zoom_value)
 
-    def zoom_request(self, delta):
-        # get the current scrollbar positions
-        # calculate the percentages ~ coordinates
-        h_bar = self.scroll_bars[QtCore.Qt.Horizontal]
-        v_bar = self.scroll_bars[QtCore.Qt.Vertical]
+    def zoom_request(self, delta, pos):
+        canvas_width_old = self.canvas.width()
+        units = 1.1
+        if delta < 0:
+            units = 0.9
+        self.add_zoom(units)
 
-        # get the current maximum, to know the difference after zooming
-        h_bar_max = h_bar.maximum()
-        v_bar_max = v_bar.maximum()
+        canvas_width_new = self.canvas.width()
+        if canvas_width_old != canvas_width_new:
+            canvas_scale_factor = canvas_width_new / canvas_width_old
 
-        # get the cursor position and canvas size
-        # calculate the desired movement from 0 to 1
-        # where 0 = move left
-        #       1 = move right
-        # up and down analogous
-        cursor = QtGui.QCursor()
-        pos = cursor.pos()
-        relative_pos = QtWidgets.QWidget.mapFromGlobal(self, pos)
+            x_shift = round(pos.x() * canvas_scale_factor - pos.x())
+            y_shift = round(pos.y() * canvas_scale_factor - pos.y())
 
-        cursor_x = relative_pos.x()
-        cursor_y = relative_pos.y()
-
-        w = self.scroll_area.width()
-        h = self.scroll_area.height()
-
-        # the scaling from 0 to 1 has some padding
-        # you don't have to hit the very leftmost pixel for a maximum-left movement
-        margin = 0.1
-        move_x = (cursor_x - margin * w) / (w - 2 * margin * w)
-        move_y = (cursor_y - margin * h) / (h - 2 * margin * h)
-
-        # clamp the values from 0 to 1
-        move_x = min(max(move_x, 0), 1)
-        move_y = min(max(move_y, 0), 1)
-
-        # zoom in
-        units = delta / (8 * 15)
-        scale = 10
-        self.add_zoom(scale * units)
-
-        # get the difference in scrollbar values
-        # this is how far we can move
-        d_h_bar_max = h_bar.maximum() - h_bar_max
-        d_v_bar_max = v_bar.maximum() - v_bar_max
-
-        # get the new scrollbar values
-        new_h_bar_value = h_bar.value() + move_x * d_h_bar_max
-        new_v_bar_value = v_bar.value() + move_y * d_v_bar_max
-
-        h_bar.setValue(new_h_bar_value)
-        v_bar.setValue(new_v_bar_value)
+            self.set_scroll(
+                QtCore.Qt.Horizontal,
+                self.scroll_bars[QtCore.Qt.Horizontal].value() + x_shift,
+            )
+            self.set_scroll(
+                QtCore.Qt.Vertical,
+                self.scroll_bars[QtCore.Qt.Vertical].value() + y_shift,
+            )
 
     def set_fit_window(self, value=True):
         if value:
@@ -792,7 +771,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
             y_min = int(box[1])
             y_max = int(box[1] + box[3])
             points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
-            shapes.append((label, points, None, None, False))
+            shapes.append((label, "rectangle", points, None, None, False))
         self.debug.debug("List shape : " + str(shapes))
         self.load_labels(shapes)
 
