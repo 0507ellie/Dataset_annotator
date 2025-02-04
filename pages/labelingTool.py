@@ -1001,8 +1001,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 					continue
 				new_shape = format_shape(_shape)
 
-				# Determine whether the new shape is similar to an existing shape
-				similar_shapes = [shape for shape in shapes if similarity(shape[2], new_shape[2]) > float(self.overlap_label.text())]
+				if _shape.shape_type == "rectangle":
+					# Determine whether the new shape is similar to an existing shape
+					similar_shapes = [shape for shape in shapes if similarity(shape[2], new_shape[2]) > float(self.overlap_label.text())]
+				else:
+					similar_shapes = False
+	 
 				if not similar_shapes:
 					shapes.append(new_shape)
 			self.label_list.clear()
