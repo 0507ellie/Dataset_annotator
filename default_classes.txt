@@ -1,2 +1,7 @@
-person
-cones
+forklift
+wetfloorsign
+cardbox
+steeldrum
+trafficcone
+rackablepallet
+recycledwoodpallet

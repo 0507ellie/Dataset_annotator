@@ -392,7 +392,7 @@ class ThumbnailView(QDialog):
 											if (isinstance(temp_QWidget, QClickableImage)) and 
 												temp_QWidget.objectName() != image_QWidget.objectName() and
 												temp_QWidget.image_id.annotation_path == image_QWidget.image_id.annotation_path]
-						shapes = [ dict(label=image_id.label, points=image_id.points, difficult=image_id.difficult) for image_id in temp_image_ids]
+						shapes = [ dict(label=image_id.label, type="rectangle", points=image_id.points, difficult=image_id.difficult) for image_id in temp_image_ids]
 
 						if Path(image_QWidget.image_path).exists() :
 							i += 1
@@ -402,8 +402,8 @@ class ThumbnailView(QDialog):
 							try:
 								if self.parent.label_file_format.value == LabelFileFormat.PASCAL_VOC.value:
 									t_voc_parse_reader = PascalVocReader(image_QWidget.image_id.annotation_path) 
-									shapes += [ dict(label=label, points=points, difficult=difficult) 
-												for label, points, _, _, difficult in t_voc_parse_reader.get_shapes() if label != self.displaytext.text()]
+									shapes += [ dict(label=label, type=type, points=points, difficult=difficult) 
+												for label, type, points, _, _, difficult in t_voc_parse_reader.get_shapes() if label != self.displaytext.text()]
 
 									self.label_file.save_pascal_voc_format(image_QWidget.image_id.annotation_path, 
 																			shapes, 
@@ -411,8 +411,8 @@ class ThumbnailView(QDialog):
 																			image_QWidget.image_id.image)
 								elif self.parent.label_file_format.value == LabelFileFormat.YOLO.value:
 									t_yolo_parse_reader = YoloReader(image_QWidget.image_id.annotation_path, image_QWidget.image_id.image, self.parent.classes_file)
-									shapes += [ dict(label=label, points=points, difficult=difficult) 
-												for label, points, _, _, difficult in t_yolo_parse_reader.get_shapes() if label != self.displaytext.text()]
+									shapes += [ dict(label=label, type=type, points=points, difficult=difficult) 
+												for label, type, points, _, _, difficult in t_yolo_parse_reader.get_shapes() if label != self.displaytext.text()]
 									self.label_file.save_yolo_format(image_QWidget.image_id.annotation_path, 
 																		shapes, 
 																		image_QWidget.image_id.image_path, 
@@ -420,8 +420,8 @@ class ThumbnailView(QDialog):
 																		self.parent.tagLineEdit.tags)
 								elif self.parent.label_file_format.value == LabelFileFormat.CREATE_ML.value:
 									t_ml_parse_reader = CreateMLReader(image_QWidget.image_id.annotation_path, image_QWidget.image_id.image_path)
-									shapes += [ dict(label=label, points=points, difficult=difficult) 
-												for label, points, _, _, difficult in t_ml_parse_reader.get_shapes() if label != self.displaytext.text()]
+									shapes += [ dict(llabel=label, type=type, points=points, difficult=difficult) 
+												for label, type, points, _, _, difficult in t_ml_parse_reader.get_shapes() if label != self.displaytext.text()]
 									self.label_file.save_create_ml_format(image_QWidget.image_id.annotation_path, 
 																			shapes, 
 																			image_QWidget.image_id.image_path, 

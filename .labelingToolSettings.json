@@ -1,0 +1,36 @@
+{
+    "filename": "",
+    "window/size": {
+        "__type__": "QSize",
+        "width": 1047,
+        "height": 924
+    },
+    "window/position": {
+        "__type__": "QPoint",
+        "x": 70,
+        "y": 27
+    },
+    "window/state": {
+        "__type__": "QByteArray",
+        "data": "000000ff00000000fd00000001000000010000010700000363fc0200000003fb0000000c004c006100620065006c0073010000001f000001af0000010700fffffffb0000000c004c006100620065006c007301000001d700000102000000a400fffffffb0000000a00460069006c0065007301000002e2000000a00000006300ffffff000002c30000036300000004000000040000000800000008fc000000010000000000000001000000180054006f006f006c00730054006f006f006c0042006100720300000000ffffffff0000000000000000"
+    },
+    "line/color": {
+        "__type__": "QColor",
+        "rgba": 4278255360
+    },
+    "fill/color": {
+        "__type__": "QColor",
+        "rgba": 4284769380
+    },
+    "recentFiles": [],
+    "advanced": false,
+    "savedir": "",
+    "lastOpenDir": "",
+    "autosave": false,
+    "paintlabel": false,
+    "draw/square": false,
+    "labelFileFormat": {
+        "__type__": "LabelFileFormat",
+        "value": "PASCAL_VOC"
+    }
+}

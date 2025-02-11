@@ -227,7 +227,7 @@ class Shape(object):
                         self.label = ""
                     if min_y < min_y_label:
                         min_y += min_y_label
-                    painter.drawText(min_x, min_y, self.label)
+                    painter.drawText(int(min_x), int(min_y), self.label)
                 
     def draw_vertex(self, path, i):
         """Draw a vertex"""

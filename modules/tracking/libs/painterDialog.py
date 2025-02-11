@@ -475,7 +475,7 @@ class PainterDialog(QtWidgets.QDialog, WindowMixin):
         self.set_scroll(orientation, value)
 
     def set_scroll(self, orientation, value):
-        self.scroll_bars[orientation].setValue(round(value))
+        self.scroll_bars[orientation].setValue(np.int32(round(value)))
 
     def set_zoom(self, value):
         self.actions.fitWidth.setChecked(False)

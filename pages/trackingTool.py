@@ -208,7 +208,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if default_filedir:
             video_paths = [str(item) for item in Path(default_filedir).iterdir() if item.is_file()]
             self.load_video_files(video_paths)
-            self.timer.start(1000 // self.fps)
+            self.timer.start(int(1000 // self.fps))
 
     def toggle_actions(self, value=True):
         self.actions.open_painter.setEnabled(value)
@@ -265,7 +265,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if not self.timer.isActive() and self.current_video_index != -1:
             if not self.cap.isOpened():
                 self.play_next_video()
-            self.timer.start(1000 // self.fps)
+            self.timer.start(int(1000 // self.fps))
 
     def open_painter(self):
         if self.tracker:
@@ -275,7 +275,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             ret, image = self.cap.retrieve()
             self.tracker.initBox(image)
             if not self.timer.isActive():
-                self.timer.start(1000 // self.fps)
+                self.timer.start(int(1000 // self.fps))
             
     def init_engine(self, image):
         self.tracker = TrackerDetector(debug=debug, cpu_workers=mp.cpu_count() - 1)
@@ -426,7 +426,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             self.init_save_folder(str(Path(self.video_files[self.current_video_index]).stem), Path(self.default_save_dir))
             
         if not self.timer.isActive() and self.current_video_index != -1:
-            self.timer.start(1000 // self.fps)
+            self.timer.start(int(1000 // self.fps))
     
     def change_filter_dialog(self, _value=False):
         if self.timer.isActive():
@@ -438,7 +438,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.filterDialog.hide()
         
         if not self.timer.isActive() and self.current_video_index != -1:
-            self.timer.start(1000 // self.fps)
+            self.timer.start(int(1000 // self.fps))
             
     def closeEvent(self, event):
         if self.timer.isActive():

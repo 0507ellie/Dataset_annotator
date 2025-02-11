@@ -3,7 +3,7 @@ from enum import Enum
 from qtpy import QtCore, QtGui, QtWidgets
 from pages.resources.resources  import *
 
-__version_info__ = ('1', '1', '0', '2501')
+__version_info__ = ('1', '2', '0', '2502')
 __version__ = '.'.join(__version_info__)
 
 class AnnotatorType(Enum):

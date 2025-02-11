@@ -1,10 +1,10 @@
 from turtle import shapesize
 import cv2
 import queue
+import os
 
 import rclpy
 import codecs, os
-import random
 import numpy as np
 from typing import *
 from rclpy.node import Node
@@ -20,8 +20,9 @@ from modules.labeling.libs.yolo_io import TXT_EXT
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
 from modules.labeling.libs.utils import generate_color_by_text
 from modules.labeling.libs.shape import Shape
-from modules.isaacSim.ros import initialize_ros, ros_numpy, ros_dict, ros_image
+from modules.isaacSim.ros import ROS_VERSION, initialize_ros, ros_numpy, ros_dict, ros_image
 
+    
 ISAAC_SIM = True
 
 IMAGE_TAG = "images"
@@ -56,16 +57,16 @@ class InfoSubscriber(Node):
         # ----------------------------- rgb image ------------------------------
         self.create_subscription(
             CompressedImage, RGB_TOPIC, self._callback_rgb_subscriber, 10)
-        self.create_subscription(
-            Image, RGB_TOPIC, self._callback_rgb_subscriber, 10)
+        # self.create_subscription(
+        #     Image, RGB_TOPIC, self._callback_rgb_subscriber, 10)
         self._rgb_queue = queue.Queue(maxsize=5)
 
         # Labeling Part
         # ----------------------------- semantic image ------------------------------
         self.create_subscription(
             CompressedImage, SEMANTIC_TOPIC, self._callback_semantic_subscriber, 10)
-        self.create_subscription(
-            Image, SEMANTIC_TOPIC, self._callback_semantic_subscriber, 10)
+        # self.create_subscription(
+        #     Image, SEMANTIC_TOPIC, self._callback_semantic_subscriber, 10)
         self._semantic_queue = queue.Queue(maxsize=5)
         
         self.create_subscription(
@@ -230,14 +231,23 @@ class InfoSubscriber(Node):
             info: Detection2D
             for _info in info.results:
                 _info: ObjectHypothesisWithPose
-                id = self._detect_index_mapping.get(int(_info.id), None)
-            
+                if ROS_VERSION == "humble":
+                    id = self._detect_index_mapping.get(int(_info.hypothesis.class_id), None)
+                else:
+                    id = self._detect_index_mapping.get(int(_info.id), None)
+                 
             if id is not None:
                 label = self.label_hist[id]
-                sx = int(info.bbox.center.x - (info.bbox.size_x/2))
-                sy = int(info.bbox.center.y - (info.bbox.size_y/2))
-                ex = int(info.bbox.center.x + (info.bbox.size_x/2))
-                ey = int(info.bbox.center.y + (info.bbox.size_y/2))
+                if ROS_VERSION == "humble":
+                    sx = int(info.bbox.center.position.x - (info.bbox.size_x/2))
+                    sy = int(info.bbox.center.position.y - (info.bbox.size_y/2))
+                    ex = int(info.bbox.center.position.x + (info.bbox.size_x/2))
+                    ey = int(info.bbox.center.position.y + (info.bbox.size_y/2))
+                else:
+                    sx = int(info.bbox.center.x - (info.bbox.size_x/2))
+                    sy = int(info.bbox.center.y - (info.bbox.size_y/2))
+                    ex = int(info.bbox.center.x + (info.bbox.size_x/2))
+                    ey = int(info.bbox.center.y + (info.bbox.size_y/2))
                 shape = Shape(label=label, shape_type="rectangle")
                 shape.add_point((sx, sy))
                 shape.add_point((ex, sy))
@@ -279,6 +289,7 @@ def main(args=None):
     try:
         color_image = None
         semantic_image = None
+        display_image = None
         shapes = []
         # temp testing save label
         i = 0
@@ -288,17 +299,18 @@ def main(args=None):
             
             if subscriber.has_rgb():
                 color_image = subscriber.get_rgb_results()
+
                 display_image = color_image.copy()
             
-            if subscriber.has_bbox():
-                b_shapes = subscriber.get_bbox_results()
+                if subscriber.has_bbox():
+                    b_shapes = subscriber.get_bbox_results()
 
-                for shape in b_shapes:
-                    _shape: Shape = shape
-                    cv2.rectangle(display_image, _shape.points[0], _shape.points[2], _shape.line_color, int(_shape.line_width))
-                    cv2.putText(display_image, _shape.label, 
-                                _shape.points[0], cv2.FONT_HERSHEY_TRIPLEX, 1, (255, 255, 255), 2)
-                shapes.extend(b_shapes)
+                    for shape in b_shapes:
+                        _shape: Shape = shape
+                        cv2.rectangle(display_image, _shape.points[0], _shape.points[2], _shape.line_color, int(_shape.line_width))
+                        cv2.putText(display_image, _shape.label, 
+                                    _shape.points[0], cv2.FONT_HERSHEY_TRIPLEX, 1, (255, 255, 255), 2)
+                    shapes.extend(b_shapes)
             
             if subscriber.has_semantic():
                 semantic_image, s_shapes = subscriber.get_semantic_results()
@@ -319,8 +331,9 @@ def main(args=None):
                 cv2.imshow("ROS2 Semantic/Detect Label Subscriber", semantic_rgb_image)
                 shapes.extend(s_shapes)
                 
-            if color_image is not None and shapes:
-                subscriber.save_file(i, color_image, shapes)
+            if color_image is not None:
+                if shapes:
+                    subscriber.save_file(i, color_image, shapes)
                 cv2.imshow("ROS2 RGB Subscriber", display_image)
             i += 1
             if cv2.waitKey(1) & 0xFF == ord('q'):  # 按 'q' 退出

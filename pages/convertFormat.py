@@ -140,7 +140,7 @@ class FormatConvert(object):
 		image.save(image_save_path)
 		# save label
 		label_file = LabelFile()
-		convert_shapes = [ dict(label=label, points=points, difficult=difficult) for label, points, _, _, difficult in self.shapes]
+		convert_shapes = [ dict(label=label, type=type, points=points, difficult=difficult) for label, type, points, _, _, difficult in self.shapes]
 		if label_file.suffix == TXT_EXT :
 			label_file.save_yolo_format(txt_path, convert_shapes, image_save_path, image, self.classes)
 		elif label_file.suffix == XML_EXT :

@@ -890,7 +890,7 @@ class Canvas(QtWidgets.QWidget):
                         current_width = abs(point1.x() - point3.x())
                         current_height = abs(point1.y() - point3.y())
                         p.setFont(QtGui.QFont("黑体", 6))
-                        p.drawText(x + 5 , y + 10, "W: {}, H: {}".format(abs(int(current_width)), abs(int(current_height))) )
+                        p.drawText(int(x + 5) , int(y + 10), "W: {}, H: {}".format(abs(int(current_width)), abs(int(current_height))) )
                     if shape.shape_type == "polygon":
                         if len(shape) > 3:
                             point1 = shape[1]
@@ -899,7 +899,7 @@ class Canvas(QtWidgets.QWidget):
                             y = max(point1.y(), point3.y())
 
                             p.setFont(QtGui.QFont("黑体", 6))
-                            p.drawText(x + 5 , y + 10, "Nums: {}".format(abs(len(shape))) )
+                            p.drawText(int(x + 5) , int(y + 10),"Nums: {}".format(abs(len(shape))) )
                 
         if self.current:
             self.current.paint(p)
@@ -934,7 +934,7 @@ class Canvas(QtWidgets.QWidget):
             if self.create_mode == "rectangle":
                 p.drawRect(int(left_top.x()), int(left_top.y()), int(rect_width), int(rect_height))
                 p.setFont(QtGui.QFont("黑体", 6))
-                p.drawText(x + 5 , y + 10, "W: {}, H: {}".format(abs(int(rect_width)), abs(int(rect_height))) )
+                p.drawText(int(x + 5) , int(y + 10), "W: {}, H: {}".format(abs(int(rect_width)), abs(int(rect_height))) )
 
         if self.drawing() and self.create_mode == "rectangle" and not self.prev_point.isNull() and not self.out_of_pixmap(self.prev_point):
             p.setPen(QtGui.QColor(0, 0, 0))

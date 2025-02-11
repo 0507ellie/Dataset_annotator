@@ -80,8 +80,8 @@ class Loader(QtWidgets.QWidget):
             circleRect.moveTop(circleRect.top() - textHeight)
             middle = circleRect.center().x()
             qp.drawText(
-                middle - textWidth / 2, circleRect.bottom() + textHeight, 
-                textWidth, textHeight, 
+                int(middle - textWidth / 2), int(circleRect.bottom() + textHeight), 
+                int(textWidth), int(textHeight), 
                 QtCore.Qt.AlignCenter, text)
 
         self.gradient.setColorAt(.5, self.palette().windowText().color())
