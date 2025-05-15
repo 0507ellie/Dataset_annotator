@@ -6,6 +6,7 @@ import os
 import rclpy
 import codecs, os
 import numpy as np
+import message_filters
 from typing import *
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CompressedImage
@@ -55,10 +56,10 @@ class InfoSubscriber(Node):
         self.__temp_detect_label = {}
         
         # ----------------------------- rgb image ------------------------------
-        self.create_subscription(
-            CompressedImage, RGB_TOPIC, self._callback_rgb_subscriber, 10)
+        self._rgb_sub = message_filters.Subscriber(self, CompressedImage, RGB_TOPIC)
+        # self._rgb_sub = message_filters.Subscriber(self, Image, "/Isaac" + RGB_TOPIC)
         # self.create_subscription(
-        #     Image, RGB_TOPIC, self._callback_rgb_subscriber, 10)
+        #     CompressedImage, RGB_TOPIC, self._callback_rgb_subscriber, 10)
         self._rgb_queue = queue.Queue(maxsize=5)
 
         # Labeling Part
@@ -73,12 +74,18 @@ class InfoSubscriber(Node):
             String, SEMANTIC_TOPIC + "/class_name", self._callback_semantic_labels, 10)
 
         # ----------------------------- 2d bbox ------------------------------
-        self.create_subscription(
-            Detection2DArray, DETECT_TOPIC, self._callback_detect_subscriber, 10)
+        self._bbox_sub = message_filters.Subscriber(self, Detection2DArray, DETECT_TOPIC)
+        # self.create_subscription(
+        #     Detection2DArray, DETECT_TOPIC, self._callback_detect_subscriber, 10)
         
         self.create_subscription(
             String, DETECT_TOPIC + "/class_name", self._callback_detect_labels, 10)
         self._bbox_queue = queue.Queue(maxsize=5)
+
+        self.ts = message_filters.ApproximateTimeSynchronizer([self._rgb_sub, self._bbox_sub], 
+                                                              10, slop=0.1, allow_headerless=True)
+        
+        self.ts.registerCallback(self._callback_sync_subscriber)
         
     def load_predefined_classes(self, predef_classes_file):
         label_hist = None
@@ -282,7 +289,13 @@ class InfoSubscriber(Node):
                         # else:
                         #     self._detect_index_mapping[int(idx)] = -1  # Unknown label mapping is -1
                 # subscription.destroy()
-                            
+    
+    # -----------------------------------------------------------------------------------------
+    def _callback_sync_subscriber(self, rgb_msg: Union[Image, CompressedImage], bbox_msg: Detection2DArray):
+        # print("aaa :", rgb_msg, bbox_msg)
+        self._callback_rgb_subscriber(rgb_msg)
+        self._callback_detect_subscriber(bbox_msg)
+        
 def main(args=None):
     initialize_ros()
     subscriber = InfoSubscriber("default_classes.txt")
@@ -328,13 +341,13 @@ def main(args=None):
                     for id, label in enumerate(subscriber.label_hist):
                         text = f"{id}: {label}"
                         cv2.putText(semantic_rgb_image, text, (10, (id+1)*25), cv2.FONT_HERSHEY_TRIPLEX, 0.8, subscriber.class_colors[id], 2)
-                cv2.imshow("ROS2 Semantic/Detect Label Subscriber", semantic_rgb_image)
+                cv2.imshow("ROS2 Semantic/Detect Label Subscriber", cv2.resize(semantic_rgb_image, (720, 360)))
                 shapes.extend(s_shapes)
                 
             if color_image is not None:
                 if shapes:
                     subscriber.save_file(i, color_image, shapes)
-                cv2.imshow("ROS2 RGB Subscriber", display_image)
+                cv2.imshow("ROS2 RGB Subscriber", cv2.resize(display_image, (720, 360)))
             i += 1
             if cv2.waitKey(1) & 0xFF == ord('q'):  # 按 'q' 退出
                 break

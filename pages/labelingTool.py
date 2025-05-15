@@ -967,6 +967,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 	def auto_label_infer(self):
 		if self.file_path != None:
 			prompts = dict(image=self.file_path, prompt='.'.join(self.tagLineEdit.tags))
+			if self.mode_btn.label == "Online":
+				self.error_message(u'Online', "The online version is currently not available for free.")
+				return
+
 			self._infer_thread = InferenceThread(self.mode_btn.label, prompts, self)
 			self._infer_thread.message.connect(self.status)
 			self._infer_thread.inferenceFinished.connect(self.auto_label_result)

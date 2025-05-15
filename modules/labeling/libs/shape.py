@@ -15,7 +15,7 @@ import copy
 import math
 
 DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)  # bf hovering
-DEFAULT_FILL_COLOR = QColor(100, 100, 100, 100)  # hovering
+DEFAULT_FILL_COLOR = QColor(0, 255, 0, 100)  # hovering
 DEFAULT_SELECT_LINE_COLOR = QColor(255, 255, 255)  # selected
 DEFAULT_SELECT_FILL_COLOR = QColor(0, 255, 0, 155)  # selected
 DEFAULT_VERTEX_FILL_COLOR = QColor(0, 255, 0, 255)  # hovering

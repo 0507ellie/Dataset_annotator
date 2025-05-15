@@ -60,7 +60,13 @@ class Settings(object):
             elif isinstance(data, QByteArray):
                 return {'__type__': 'QByteArray', 'data': data.toHex().data().decode()}  # Fix QByteArray serialization
             elif isinstance(data, QColor):
-                return {'__type__': 'QColor', 'rgba': data.rgba()}
+                return {
+                    '__type__': 'QColor',
+                    'r': data.red(),
+                    'g': data.green(),
+                    'b': data.blue(),
+                    'a': data.alpha()
+                }
             elif isinstance(data, LabelFileFormat):
                 return {'__type__': 'LabelFileFormat', 'value': data.name}  # Serialize enum as string
         elif isinstance(data, dict):
@@ -81,7 +87,7 @@ class Settings(object):
                 elif data['__type__'] == 'QByteArray':
                     return QByteArray.fromHex(bytes(data['data'], 'utf-8'))
                 elif data['__type__'] == 'QColor':
-                    return QColor(data['rgba'])
+                    return QColor(data['r'], data['g'], data['b'], data['a'])
                 elif data['__type__'] == 'LabelFileFormat':  # Deserialize enum from string
                     return LabelFileFormat[data['value']]
             else:
