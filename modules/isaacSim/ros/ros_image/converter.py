@@ -250,7 +250,10 @@ def cvimage_to_compressed_imgmsg(cvim, dst_format='jpeg', quality: int = 100):
             buffer = cv2.imencode(ext_format, cvim, [int(cv2.IMWRITE_JPEG_QUALITY), quality])[1].tobytes()
         elif dst_format.lower() == 'png':
             # Use PNG compression for uint8 or uint16
-            buffer = cv2.imencode(ext_format, cvim, [int(cv2.IMWRITE_PNG_COMPRESSION), quality])[1].tobytes()
+            quality = max(0, min(quality, 100))  # Clamp to [0, 100]
+            compression_level = int((quality / 100) * 9)
+            buffer = cv2.imencode(ext_format, cvim, [int(cv2.IMWRITE_PNG_COMPRESSION), compression_level])[1].tobytes()
+        
         else:
             raise ValueError(f"Unsupported format: {dst_format}")
         

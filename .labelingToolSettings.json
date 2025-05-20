@@ -12,7 +12,7 @@
     },
     "window/state": {
         "__type__": "QByteArray",
-        "data": "000000ff00000000fd00000001000000010000010700000316fc0200000003fb0000000c004c006100620065006c0073010000001f000001830000010700fffffffb0000000c004c006100620065006c007301000001ab000000ee000000a400fffffffb0000000a00460069006c0065007301000002a2000000930000006300ffffff000005560000031600000004000000040000000800000008fc000000010000000000000001000000180054006f006f006c00730054006f006f006c0042006100720300000000ffffffff0000000000000000"
+        "data": "000000ff00000000fd0000000100000001000001df00000316fc0200000003fb0000000c004c006100620065006c0073010000001f000001070000010700fffffffb0000000c004c006100620065006c0073010000012f000000a4000000a400fffffffb0000000a00460069006c0065007301000001dc000001590000006300ffffff0000047e0000031600000004000000040000000800000008fc000000010000000000000001000000180054006f006f006c00730054006f006f006c0042006100720300000000ffffffff0000000000000000"
     },
     "line/color": {
         "__type__": "QColor",
@@ -29,13 +29,13 @@
         "a": 100
     },
     "recentFiles": [
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/7_jpg.rf.b2b482949e4da8d401fef07df79c3ee4.jpg",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/7_jpeg_jpg.rf.c75f0d2da41c63d2468613bf41907d45.jpg",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/6_jpeg_jpg.rf.fca8c63fae984476478252b7f0c53f48.jpg",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/5images_jpg.rf.9413f07748ad07467a6ad4aa6ee66833.jpg",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/5_jpg.rf.c381613e4110a667c163e26b35de40de.jpg",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/5_jpeg_jpg.rf.844aa4f65d5e4c83370e7073523ce336.jpg",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/4_jpg.rf.44d47d34808be8450d8f68fe8907596c.jpg"
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 09_07_59.png",
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 09_08_28.png",
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_21_49.png",
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_22_31.png",
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_24_13.png",
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_24_36.png",
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_24_56.png"
     ],
     "advanced": false,
     "savedir": "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/labels",
