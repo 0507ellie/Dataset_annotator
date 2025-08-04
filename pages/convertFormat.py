@@ -1,9 +1,9 @@
-
 from pages.resources.resources  import *
 
 import os, sys
 import codecs
 import argparse
+import json
 from typing import *
 from pathlib import Path
 from qtpy import QtCore, QtGui, QtWidgets
@@ -13,6 +13,7 @@ from modules.labeling.libs.constants import *
 from modules.labeling.libs.yolo_io import TXT_EXT, YoloReader
 from modules.labeling.libs.pascal_voc_io import XML_EXT, PascalVocReader
 from modules.labeling.libs.create_ml_io import JSON_EXT, CreateMLReader
+from modules.labeling.libs.coco_io import CocoWriter, CocoReader
 from modules.labeling.libs.labelFile import LabelFileFormat, LabelFile
 from modules.tracking.libs.style import TABLE_QSS, BTN_QSS, LIST_QSS
 
@@ -85,6 +86,8 @@ class FormatConvert(object):
 			LabelFile.suffix = TXT_EXT
 		elif save_format == FORMAT_CREATEML:
 			LabelFile.suffix = JSON_EXT
+		elif save_format == FORMAT_COCO:
+			LabelFile.suffix = JSON_EXT
 
 	def load_predefined_classes(self, predef_classes_file: str) -> None:
 		self.classes = []
@@ -115,13 +118,20 @@ class FormatConvert(object):
 			self.shapes = t_yolo_parse_reader.get_shapes()
 			# print("YoloReader shape : " + str(len(self.shapes)))
 		elif os.path.isfile(json_path):
-			create_ml_parse_reader = CreateMLReader(json_path, image_path)
-			self.shapes = create_ml_parse_reader.get_shapes()
-			# print("CreateMLReader shape : " + str(self.shapes))
+			# create_ml_parse_reader = CreateMLReader(json_path, image_path)
+			# self.shapes = create_ml_parse_reader.get_shapes()
+			# # print("CreateMLReader shape : " + str(self.shapes))
+			# Try CreateML first, then COCO
+			try:
+				create_ml_parse_reader = CreateMLReader(json_path, image_path)
+				self.shapes = create_ml_parse_reader.get_shapes()
+			except:
+				coco_parse_reader = CocoReader(json_path, image_path)
+				self.shapes = coco_parse_reader.get_shapes()
 		self.image_path = image_path
 		self.label_path = label_path
 
-	def convert_annotation(self, save_name: str, output_root_dir: str):
+	def convert_annotation(self, save_name: str, output_root_dir: str, save_format: str = None):
 		new_image_dir = Path(output_root_dir).joinpath(FormatConvert.IMAGE_TAG)
 		new_image_dir.mkdir(parents=True, exist_ok=True)
 		new_label_dir = Path(output_root_dir).joinpath(FormatConvert.LABEL_TAG)
@@ -146,7 +156,11 @@ class FormatConvert(object):
 		elif label_file.suffix == XML_EXT :
 			label_file.save_pascal_voc_format(xml_path, convert_shapes, image_save_path, image) 
 		elif label_file.suffix == JSON_EXT :  
-			label_file.save_create_ml_format(json_path, convert_shapes, image_save_path, image, self.classes)
+			#label_file.save_create_ml_format(json_path, convert_shapes, image_save_path, image, self.classes)
+			if save_format == FORMAT_COCO:
+				label_file.save_coco_format(json_path, convert_shapes, image_save_path, image, self.classes)
+			else:
+				label_file.save_create_ml_format(json_path, convert_shapes, image_save_path, image, self.classes)
 
 class DragInWidget(QtWidgets.QListWidget):
 	""" Drag directories to this widget """
@@ -420,9 +434,11 @@ class MainWidget(QtWidgets.QWidget):
 		xmlIcon = QtGui.QIcon(':/format_voc')
 		txtIcon = QtGui.QIcon(':/format_yolo')
 		jsonIcon = QtGui.QIcon(':/format_createml')
+		cocoIcon = QtGui.QIcon(':/format_coco')
 		self.formatcomboBox.addItem(xmlIcon, FORMAT_PASCALVOC)
 		self.formatcomboBox.addItem(txtIcon, FORMAT_YOLO)
 		self.formatcomboBox.addItem(jsonIcon, FORMAT_CREATEML)
+		self.formatcomboBox.addItem(cocoIcon, FORMAT_COCO)
 		self.formatcomboBox.setCurrentIndex(1)
 		formatFLayout.addRow(formatLabel, self.formatcomboBox)
 
@@ -504,17 +520,132 @@ class MainWidget(QtWidgets.QWidget):
 			return
 		else:
 			output_dir_path.mkdir(parents=True, exist_ok=True)
+		
 		converter = FormatConvert(self.classes_file)
-		converter.change_format(self.formatcomboBox.currentText())
+		current_format = self.formatcomboBox.currentText()  # Get the format here
+		converter.change_format(current_format)
+		
 		self.progressBarWork = progressBarWorker()
 		self.progressBarWork.progressBarValue.connect(self._updateConvertToolBar)
-		self.progressBar.setMaximum(len(self.tableWidget.getTableData()))
-		for id, (image_path, label_path) in enumerate(self.tableWidget.getTableData()):
-			save_name = str(id).zfill(6)
-			converter.read_annotation(image_path, label_path)
-			converter.convert_annotation(save_name, output_dir_path)
-			self.progressBarWork.progressBarValue.emit(id+1)
+		table_data = self.tableWidget.getTableData()
+		self.progressBar.setMaximum(len(table_data))
+		
+		# For COCO format, use a single JSON file
+		if current_format == FORMAT_COCO:
+			output_data_dir = Path(output_dir_path).joinpath("data")
+			output_data_dir.mkdir(parents=True, exist_ok=True)
+			coco_json_path = output_data_dir.joinpath("_annotations.coco.json")
+
+			# Build categories from self.classes (default_classes.txt)
+			categories = []
+			supercategory = "none"
+			if len(converter.classes) > 0:
+				categories.append({"id": 0, "name": converter.classes[0], "supercategory": supercategory})
+				for idx, name in enumerate(converter.classes[1:], 1):
+					categories.append({"id": idx, "name": name, "supercategory": converter.classes[0]})
+			category_id_map = {cat["name"]: cat["id"] for cat in categories}
+
+			images = []
+			annotations = []
+			image_id_map = {}
+			annotation_id = 0
+
+			for id, (image_path, label_path) in enumerate(table_data):
+				save_name = str(id).zfill(6) + Path(image_path).suffix.lower()
+				reader = QtGui.QImageReader(image_path)
+				reader.setAutoTransform(True)
+				image = reader.read()
+				if image.isNull():
+					print(f"Warning: Could not load image {image_path}")
+					self.progressBarWork.progressBarValue.emit(id + 1)
+					continue
+				image_save_path = str(output_data_dir.joinpath(save_name))
+				image.save(image_save_path)
+				width, height = image.width(), image.height()
+				images.append({
+					"id": id,
+					"width": width,
+					"height": height,
+					"file_name": save_name,
+					"license": 1,
+					"date_captured": QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+				})
+				image_id_map[save_name] = id
+
+			# Second pass: build annotations (after all images are indexed)
+			for id, (image_path, label_path) in enumerate(table_data):
+				save_name = str(id).zfill(6) + Path(image_path).suffix.lower()
+				converter.read_annotation(image_path, label_path)
+				if not converter.shapes:
+					print(f"Warning: No annotations found for {image_path}")
+					self.progressBarWork.progressBarValue.emit(id + 1)
+					continue
+				# Convert shapes to raw image coordinates
+				for label, shape_type, points, _, _, difficult in converter.shapes:
+					raw_points = []
+					for p in points:
+						if hasattr(p, 'x') and hasattr(p, 'y'):
+							x, y = float(p.x()), float(p.y())
+						else:
+							x, y = float(p[0]), float(p[1])
+						raw_points.append((x, y))
+					# bbox calculation (COCO expects [x_min, y_min, width, height])
+					x_coords = [pt[0] for pt in raw_points]
+					y_coords = [pt[1] for pt in raw_points]
+					x_min = min(x_coords)
+					y_min = min(y_coords)
+					x_max = max(x_coords)
+					y_max = max(y_coords)
+					width = x_max - x_min
+					height = y_max - y_min
+					area = width * height
+					annotation = {
+						"id": annotation_id,
+						"image_id": image_id_map[save_name],
+						"category_id": category_id_map.get(label, 0),
+						"segmentation": [],
+						"area": float(area),
+						"bbox": [float(x_min), float(y_min), float(width), float(height)],
+						"iscrowd": 0
+					}
+					annotations.append(annotation)
+					annotation_id += 1
+				self.progressBarWork.progressBarValue.emit(id + 1)
+
+			# Write COCO JSON
+			from datetime import datetime
+			coco_data = {
+				"info": {
+					"description": "Dataset converted using format converter",
+					"url": "",
+					"version": "1.0",
+					"year": datetime.now().year,
+					"contributor": "",
+					"date_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+				},
+				"licenses": [{"id": 1, "name": "Unknown", "url": ""}],
+				"images": images,
+				"annotations": annotations,
+				"categories": categories
+			}
+			with open(coco_json_path, 'w', encoding='utf-8') as f:
+				json.dump(coco_data, f, indent=2)
+			print(f"COCO conversion completed. Output saved to {coco_json_path}")
+			
+		else:
+			# For other formats, process individually as before
+			for id, (image_path, label_path) in enumerate(table_data):
+				try:
+					save_name = str(id).zfill(6)
+					converter.read_annotation(image_path, label_path)
+					converter.convert_annotation(save_name, output_dir_path, current_format)
+				except Exception as e:
+					print(f"Error processing {image_path}: {str(e)}")
+				
+				self.progressBarWork.progressBarValue.emit(id + 1)
+		
 		self.progressBar.setValue(0)
+		QtWidgets.QMessageBox.information(None, 'Success', f"Conversion completed successfully!\nOutput saved to: {output_dir_path}")
 
 def main(argv=[]):
 	app = QtWidgets.QApplication(sys.argv)

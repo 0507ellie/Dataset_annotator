@@ -2,7 +2,8 @@ lxml
 numpy==1.24.4
 pillow==10.2.0
 packaging
-PyQt5==5.14.2
+#PyQt5==5.14.2
+PyQt5==5.15.9
 pyqt5ac
 opencv-python==4.9.0.80
 opencv-contrib-python==4.9.0.80

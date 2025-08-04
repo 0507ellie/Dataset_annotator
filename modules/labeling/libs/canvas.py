@@ -959,6 +959,10 @@ class Canvas(QtWidgets.QWidget):
         """Convert from widget-logical coordinates to painter-logical coordinates."""
         return point / self.scale - self.offset_to_center()
 
+    def inverse_transform_pos(self, point):
+        """Convert from painter-logical coordinates back to widget-logical coordinates."""
+        return (point + self.offset_to_center()) * self.scale
+
     def offset_to_center(self):
         """Calculate offset to the center"""
         if self.pixmap is None:

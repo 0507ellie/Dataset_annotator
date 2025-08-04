@@ -7,12 +7,12 @@
     },
     "window/position": {
         "__type__": "QPoint",
-        "x": 70,
-        "y": 27
+        "x": 101,
+        "y": 54
     },
     "window/state": {
         "__type__": "QByteArray",
-        "data": "000000ff00000000fd0000000100000001000001df00000316fc0200000003fb0000000c004c006100620065006c0073010000001f000001070000010700fffffffb0000000c004c006100620065006c0073010000012f000000a4000000a400fffffffb0000000a00460069006c0065007301000001dc000001590000006300ffffff0000047e0000031600000004000000040000000800000008fc000000010000000000000001000000180054006f006f006c00730054006f006f006c0042006100720300000000ffffffff0000000000000000"
+        "data": "000000ff00000000fd0000000100000001000001df0000031afc0200000003fb0000000c004c006100620065006c0073010000001e00000107000000fa00fffffffb0000000c004c006100620065006c0073010000012e000000a7000000a700fffffffb0000000a00460069006c0065007301000001de0000015a0000005e00ffffff000004890000031a00000004000000040000000800000008fc000000010000000000000001000000180054006f006f006c00730054006f006f006c0042006100720300000000ffffffff0000000000000000"
     },
     "line/color": {
         "__type__": "QColor",
@@ -29,17 +29,17 @@
         "a": 100
     },
     "recentFiles": [
+        "C:\\Users\\ellie\\Downloads\\background\\4b5fe9225197871006801230207b6275.jpg",
+        "C:\\Users\\ellie\\Downloads\\background\\01-the-importance-of-airflow-in-a-modular-cleanroom.jpg",
+        "C:\\Users\\ellie\\Downloads\\background\\8d967de4fb0deac392e6fc1838a87d15_L.jpg",
+        "C:\\Users\\ellie\\Downloads\\background\\6d00c12bde6a8ef539621cd606ac11ea_L.jpg",
         "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 09_07_59.png",
         "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 09_08_28.png",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_21_49.png",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_22_31.png",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_24_13.png",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_24_36.png",
-        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_24_56.png"
+        "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/images/ch0-2025-05-15 16_21_49.png"
     ],
     "advanced": false,
-    "savedir": "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train/labels",
-    "lastOpenDir": "/mnt/56B080B0B08097DF/DataBase/Package/packages-detect.v1i.yolov11/train",
+    "savedir": "C:/Users/ellie/Downloads/background",
+    "lastOpenDir": "C:/Users/ellie/Downloads/background",
     "autosave": true,
     "paintlabel": false,
     "draw/square": false,

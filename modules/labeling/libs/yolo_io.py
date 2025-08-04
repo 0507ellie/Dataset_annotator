@@ -146,34 +146,68 @@ class YoloReader:
         return self.shapes
 
     def parse_yolo_format(self):
-        lines = open(self.file_path, 'r')
-        for line in lines:
-            line = line.strip().split(" ")
-            class_index = int(line[0])
-            try:
-                label = self.classes[int(class_index)]
-            except:
-                label = "unknown"
+        with open(self.file_path, 'r') as lines:
+            for line_num, line in enumerate(lines, 1):
+                line = line.strip()
                 
-            if len(line) == 5:
-                shape_type = "rectangle"
-                cx = float(line[1])
-                cy = float(line[2])
-                nw = float(line[3])
-                nh = float(line[4])
-                xmin = int((cx - nw / 2) * self.img_size[1])
-                ymin = int((cy - nh / 2) * self.img_size[0])
-                xmax = int((cx + nw / 2) * self.img_size[1])
-                ymax = int((cy + nh / 2) * self.img_size[0])
-                points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
-            else:
-                shape_type = "polygon"
-                points, masks = [], line[1:]
-                image_size = np.array([self.img_size[1], self.img_size[0]], np.float64)
-                for x, y in zip(masks[0::2], masks[1::2]):
-                    point = [np.float64(x), np.float64(y)]
-                    point = np.array(point, np.float64) * image_size
-                    points.append(point.tolist())
+                # Skip empty lines
+                if not line:
+                    continue
                     
-            difficult = False
-            self.shapes.append((label, shape_type, points, None, None, difficult))
+                # Skip comment lines (if any)
+                if line.startswith('#'):
+                    continue
+                    
+                line = line.split(" ")
+                
+                # Skip lines that don't have enough elements
+                if len(line) < 5:
+                    print(f"Warning: Invalid annotation at line {line_num}: {' '.join(line)}")
+                    continue
+                    
+                try:
+                    class_index = int(line[0])
+                except (ValueError, IndexError):
+                    print(f"Warning: Invalid class index at line {line_num}: {' '.join(line)}")
+                    continue
+                    
+                try:
+                    label = self.classes[class_index]
+                except IndexError:
+                    label = "unknown"
+                    print(f"Warning: Class index {class_index} not found in classes list at line {line_num}")
+                    
+                if len(line) == 5:
+                    # Rectangle format
+                    shape_type = "rectangle"
+                    try:
+                        cx = float(line[1])
+                        cy = float(line[2])
+                        nw = float(line[3])
+                        nh = float(line[4])
+                        
+                        xmin = int((cx - nw / 2) * self.img_size[1])
+                        ymin = int((cy - nh / 2) * self.img_size[0])
+                        xmax = int((cx + nw / 2) * self.img_size[1])
+                        ymax = int((cy + nh / 2) * self.img_size[0])
+                        points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+                    except (ValueError, IndexError):
+                        print(f"Warning: Invalid rectangle coordinates at line {line_num}: {' '.join(line)}")
+                        continue
+                        
+                else:
+                    # Polygon format
+                    shape_type = "polygon"
+                    try:
+                        points, masks = [], line[1:]
+                        image_size = np.array([self.img_size[1], self.img_size[0]], np.float64)
+                        for x, y in zip(masks[0::2], masks[1::2]):
+                            point = [np.float64(x), np.float64(y)]
+                            point = np.array(point, np.float64) * image_size
+                            points.append(point.tolist())
+                    except (ValueError, IndexError):
+                        print(f"Warning: Invalid polygon coordinates at line {line_num}: {' '.join(line)}")
+                        continue
+                        
+                difficult = False
+                self.shapes.append((label, shape_type, points, None, None, difficult))

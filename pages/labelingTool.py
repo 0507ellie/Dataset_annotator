@@ -1149,7 +1149,28 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 						# add chris
 						difficult=s.difficult)
 
-		shapes = [format_shape(shape) for shape in self.canvas.shapes]
+		def format_shape_coco(s):
+			# For COCO format, convert coordinates back to raw image coordinates
+			raw_points = []
+			for p in s.points:
+				# Convert from transformed coordinates back to raw image coordinates
+				raw_x = (p.x() + self.canvas.offset_to_center().x()) * self.canvas.scale
+				raw_y = (p.y() + self.canvas.offset_to_center().y()) * self.canvas.scale
+				raw_points.append((raw_x, raw_y))
+			
+			return dict(label=s.label,
+						line_color=s.line_color.getRgb(),
+						fill_color=s.fill_color.getRgb(),
+						points=raw_points,
+						type=s.shape_type,
+						difficult=s.difficult)
+
+		# Use different formatting for COCO format
+		if self.label_file_format in [LabelFileFormat.CREATE_ML, LabelFileFormat.COCO]:
+			shapes = [format_shape_coco(shape) for shape in self.canvas.shapes]
+		else:
+			shapes = [format_shape(shape) for shape in self.canvas.shapes]
+		
 		# Can add different annotation formats here
 		try:
 			if self.label_file_format == LabelFileFormat.PASCAL_VOC:

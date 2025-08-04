@@ -13,6 +13,8 @@ from .yolo_io import YOLOWriter
 from .pascal_voc_io import XML_EXT
 from .create_ml_io import CreateMLWriter
 from .create_ml_io import JSON_EXT
+from .coco_io import CocoWriter
+from .coco_io import JSON_EXT
 from enum import Enum
 import numpy as np
 import os.path
@@ -23,6 +25,7 @@ class LabelFileFormat(Enum):
     PASCAL_VOC = 1
     YOLO = 2
     CREATE_ML = 3
+    COCO = 4
 
 
 class LabelFileError(Exception):
@@ -128,7 +131,29 @@ class LabelFile(object):
             
         writer.save(target_file=filename, class_list=class_list)
         return
+    def save_coco_format(self, filename: str, 
+                        shapes: dict, 
+                        image_path: str, 
+                        image_data: Union[np.ndarray, QImage], 
+                        class_list, line_color=None, fill_color=None, database_src=None):
+        img_folder_name = os.path.basename(os.path.dirname(image_path))
+        img_file_name = os.path.basename(image_path)
 
+        if isinstance(image_data, QImage):
+            image = image_data
+        else:
+            image = QImage()
+            image.load(image_path)
+        
+        image_shape = [image.height(), image.width(),
+                    1 if image.isGrayscale() else 3]
+        
+        writer = CocoWriter(img_folder_name, img_file_name,
+                            image_shape, shapes, filename, 
+                            database_src=database_src, local_img_path=image_path)
+        writer.verified = self.verified
+        writer.write()
+        
     def toggle_verify(self):
         self.verified = not self.verified
 
